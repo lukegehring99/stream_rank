@@ -45,11 +45,15 @@ class ViewershipData:
         youtube_video_id: YouTube's video ID
         timestamps: Array of measurement timestamps (UTC)
         viewcounts: Array of viewer counts at each timestamp
+        name: Livestream name/title (optional, for display)
+        channel: Channel name (optional, for display)
     """
     livestream_id: int
     youtube_video_id: str
     timestamps: NDArray[np.datetime64]
     viewcounts: NDArray[np.int64]
+    name: str = ""
+    channel: str = ""
     
     def __post_init__(self):
         if len(self.timestamps) != len(self.viewcounts):
@@ -87,6 +91,8 @@ class ViewershipData:
             youtube_video_id=self.youtube_video_id,
             timestamps=self.timestamps[mask],
             viewcounts=self.viewcounts[mask],
+            name=self.name,
+            channel=self.channel,
         )
     
     def slice_baseline(self, start: np.datetime64, end: np.datetime64) -> "ViewershipData":
@@ -97,6 +103,8 @@ class ViewershipData:
             youtube_video_id=self.youtube_video_id,
             timestamps=self.timestamps[mask],
             viewcounts=self.viewcounts[mask],
+            name=self.name,
+            channel=self.channel,
         )
 
 
@@ -110,7 +118,10 @@ class AnomalyScore:
         youtube_video_id: YouTube's video ID  
         score: Normalized anomaly score (0-100, higher = more anomalous)
         status: Status code indicating detection result
+        name: Livestream name/title (for display)
+        channel: Channel name (for display)
         current_viewcount: Most recent viewer count
+        last_updated: Timestamp of most recent viewership data
         baseline_mean: Mean viewership in baseline window
         baseline_std: Standard deviation in baseline window
         recent_mean: Mean viewership in recent window
@@ -123,7 +134,10 @@ class AnomalyScore:
     youtube_video_id: str
     score: float
     status: AnomalyStatus
+    name: str = ""
+    channel: str = ""
     current_viewcount: Optional[int] = None
+    last_updated: Optional[datetime] = None
     baseline_mean: Optional[float] = None
     baseline_std: Optional[float] = None
     recent_mean: Optional[float] = None
@@ -137,9 +151,12 @@ class AnomalyScore:
         return {
             'livestream_id': self.livestream_id,
             'youtube_video_id': self.youtube_video_id,
+            'name': self.name,
+            'channel': self.channel,
             'score': round(self.score, 2),
             'status': self.status.value,
             'current_viewcount': self.current_viewcount,
+            'last_updated': self.last_updated.isoformat() if self.last_updated else None,
             'baseline_mean': round(self.baseline_mean, 2) if self.baseline_mean else None,
             'baseline_std': round(self.baseline_std, 2) if self.baseline_std else None,
             'recent_mean': round(self.recent_mean, 2) if self.recent_mean else None,

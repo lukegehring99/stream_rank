@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { livestreamsApi, extractVideoId } from '../api/client';
-import { Livestream, LivestreamFilters, LivestreamUpdate, PaginatedResponse, ViewershipRecord } from '../types';
+import { Livestream, LivestreamFilters, LivestreamUpdate, PaginatedResponse } from '../types';
 import toast from 'react-hot-toast';
 
 // Query keys
@@ -40,7 +40,7 @@ export const useLivestream = (id: string) => {
 
 // Fetch viewership history
 export const useViewershipHistory = (id: string, page: number = 1, pageSize: number = 100) => {
-  return useQuery<{ records: ViewershipRecord[]; total: number }>({
+  return useQuery<{ items: Array<{ id: number; livestream_id: number; timestamp: string; viewcount: number }>; total: number }>({
     queryKey: [...livestreamKeys.history(id), page, pageSize],
     queryFn: () => livestreamsApi.getHistory(id, { page, page_size: pageSize }),
     enabled: !!id,

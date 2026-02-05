@@ -121,6 +121,14 @@ class Livestream(Base):
         comment='Currently streaming',
     )
     
+    # Peak viewers (updated by worker when viewcount exceeds current peak)
+    peak_viewers: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment='Peak viewer count',
+    )
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -156,6 +164,7 @@ class Livestream(Base):
             'description': self.description,
             'url': self.url,
             'is_live': self.is_live,
+            'peak_viewers': self.peak_viewers,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

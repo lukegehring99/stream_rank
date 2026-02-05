@@ -78,6 +78,8 @@ async def list_livestreams(
     page_size: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
     search: Annotated[Optional[str], Query(description="Search term for name or channel")] = None,
     is_live: Annotated[Optional[bool], Query(description="Filter by live status")] = None,
+    sort_by: Annotated[Optional[str], Query(description="Field to sort by")] = None,
+    sort_order: Annotated[Optional[str], Query(description="Sort order (asc or desc)")] = None,
 ) -> LivestreamListResponse:
     """
     List all livestreams with pagination.
@@ -99,12 +101,25 @@ async def list_livestreams(
         skip=skip, 
         limit=page_size, 
         search=search,
-        is_live=is_live
+        is_live=is_live,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
     total_pages = (total + page_size - 1) // page_size
     
+    # Fetch current viewers for all livestreams in this batch
+    livestream_ids = [ls.id for ls in livestreams]
+    current_viewers_map = await service.get_current_viewers_map(livestream_ids)
+    
+    # Build response items with current_viewers
+    items = []
+    for ls in livestreams:
+        response = LivestreamResponse.model_validate(ls)
+        response.current_viewers = current_viewers_map.get(ls.id)
+        items.append(response)
+    
     return LivestreamListResponse(
-        items=[LivestreamResponse.model_validate(ls) for ls in livestreams],
+        items=items,
         total=total,
         page=page,
         page_size=page_size,
@@ -187,7 +202,12 @@ async def get_livestream(
             detail=f"Livestream with ID {livestream_id} not found",
         )
     
-    return LivestreamResponse.model_validate(livestream)
+    # Fetch current viewers
+    current_viewers = await service.get_current_viewers(livestream.id)
+    
+    response = LivestreamResponse.model_validate(livestream)
+    response.current_viewers = current_viewers
+    return response
 
 
 @router.put(

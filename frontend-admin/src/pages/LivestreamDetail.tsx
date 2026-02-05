@@ -95,15 +95,22 @@ export const LivestreamDetail: React.FC = () => {
     return count.toLocaleString();
   };
 
+  // Parse UTC timestamp (backend returns timestamps without Z suffix)
+  const parseUTC = (timestamp: string) => {
+    return new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
+  };
+
   // Chart data
-  const chartData = history?.records
-    .slice()
-    .reverse()
-    .map((record) => ({
-      time: format(new Date(record.recorded_at), 'HH:mm'),
-      viewers: record.viewer_count,
-      isAnomaly: record.is_anomaly,
-    }));
+  const chartData = history?.items
+    ? history.items
+        .slice()
+        .reverse()
+        .map((record) => ({
+          time: format(parseUTC(record.timestamp), 'HH:mm'),
+          viewers: record.viewcount,
+          isAnomaly: false,
+        }))
+    : undefined;
 
   if (isLoading) {
     return (
@@ -149,22 +156,16 @@ export const LivestreamDetail: React.FC = () => {
 
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-start gap-6">
-        {/* Thumbnail */}
-        <div className="w-full lg:w-80 flex-shrink-0">
-          <div className="aspect-video rounded-xl overflow-hidden bg-gray-200">
-            {stream.thumbnail_url ? (
-              <img
-                src={stream.thumbnail_url}
-                alt={stream.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </div>
-            )}
+        {/* Embedded YouTube Player */}
+        <div className="w-full lg:w-96 flex-shrink-0">
+          <div className="aspect-video rounded-xl overflow-hidden bg-gray-900">
+            <iframe
+              src={`https://www.youtube.com/embed/${stream.youtube_video_id}?autoplay=0`}
+              title={stream.name}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
           </div>
           <a
             href={`https://www.youtube.com/watch?v=${stream.youtube_video_id}`}
@@ -175,7 +176,7 @@ export const LivestreamDetail: React.FC = () => {
             <svg className="w-5 h-5 text-red-600" viewBox="0 0 24 24" fill="currentColor">
               <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
             </svg>
-            Watch on YouTube
+            Open in YouTube
           </a>
         </div>
 
@@ -282,13 +283,27 @@ export const LivestreamDetail: React.FC = () => {
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-500">Updated</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {format(new Date(stream.updated_at), 'MMM d, yyyy HH:mm')}
+                  {parseUTC(stream.updated_at).toLocaleString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZoneName: 'short',
+                  })}
                 </p>
               </div>
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-500">Added</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {format(new Date(stream.created_at), 'MMM d, yyyy HH:mm')}
+                  {parseUTC(stream.created_at).toLocaleString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZoneName: 'short',
+                  })}
                 </p>
               </div>
             </div>
@@ -367,7 +382,6 @@ export const LivestreamDetail: React.FC = () => {
               <tr>
                 <th>Timestamp</th>
                 <th>Viewer Count</th>
-                <th>Anomaly</th>
               </tr>
             </thead>
             <tbody>
@@ -376,27 +390,27 @@ export const LivestreamDetail: React.FC = () => {
                   <tr key={i}>
                     <td><div className="h-4 bg-gray-200 rounded animate-pulse w-40" /></td>
                     <td><div className="h-4 bg-gray-200 rounded animate-pulse w-20" /></td>
-                    <td><div className="h-4 bg-gray-200 rounded animate-pulse w-16" /></td>
                   </tr>
                 ))
-              ) : history?.records.length === 0 ? (
+              ) : !history?.items || history.items.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="text-center py-8 text-gray-500">
+                  <td colSpan={2} className="text-center py-8 text-gray-500">
                     No viewership records yet
                   </td>
                 </tr>
               ) : (
-                history?.records.map((record) => (
+                history.items.map((record) => (
                   <tr key={record.id}>
-                    <td>{format(new Date(record.recorded_at), 'MMM d, yyyy HH:mm:ss')}</td>
-                    <td className="font-medium">{record.viewer_count.toLocaleString()}</td>
-                    <td>
-                      {record.is_anomaly ? (
-                        <span className="badge badge-warning">Yes</span>
-                      ) : (
-                        <span className="badge badge-gray">No</span>
-                      )}
-                    </td>
+                    <td>{parseUTC(record.timestamp).toLocaleString(undefined, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      timeZoneName: 'short',
+                    })}</td>
+                    <td className="font-medium">{record.viewcount.toLocaleString()}</td>
                   </tr>
                 ))
               )}

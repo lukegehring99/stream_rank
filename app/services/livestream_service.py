@@ -11,6 +11,8 @@ from typing import Optional
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.anomaly import AsyncAnomalyDetector, AnomalyConfig
+from app.config import get_settings
 from app.models import Livestream, ViewershipHistory
 from app.schemas import (
     LivestreamCreate,
@@ -38,12 +40,17 @@ class LivestreamService:
         self.session = session
         self.cache = get_cache_service()
     
+    # Valid sort fields for get_all
+    VALID_SORT_FIELDS = {'name', 'channel', 'is_live', 'created_at', 'updated_at', 'peak_viewers'}
+    
     async def get_all(
         self, 
         skip: int = 0, 
         limit: int = 100,
         search: Optional[str] = None,
         is_live: Optional[bool] = None,
+        sort_by: Optional[str] = None,
+        sort_order: Optional[str] = None,
     ) -> tuple[list[Livestream], int]:
         """
         Get all livestreams with pagination and optional filtering.
@@ -53,6 +60,8 @@ class LivestreamService:
             limit: Maximum items to return
             search: Optional search term for name or channel
             is_live: Optional filter by live status
+            sort_by: Field to sort by (name, channel, is_live, created_at, updated_at, peak_viewers)
+            sort_order: Sort order ('asc' or 'desc')
         
         Returns:
             Tuple of (livestreams list, total count)
@@ -73,10 +82,15 @@ class LivestreamService:
         # Get total count
         total = await self.session.scalar(count_query) or 0
         
+        # Determine sort column and order
+        sort_field = sort_by if sort_by in self.VALID_SORT_FIELDS else 'created_at'
+        sort_column = getattr(Livestream, sort_field)
+        order_func = desc if sort_order != 'asc' else lambda x: x  # asc is default for columns
+        
         # Get paginated items
         stmt = (
             base_query
-            .order_by(desc(Livestream.created_at))
+            .order_by(order_func(sort_column))
             .offset(skip)
             .limit(limit)
         )
@@ -84,6 +98,56 @@ class LivestreamService:
         livestreams = list(result.scalars().all())
         
         return livestreams, total
+    
+    async def get_current_viewers_map(self, livestream_ids: list[int]) -> dict[int, int]:
+        """
+        Get the most recent viewer count for multiple livestreams.
+        
+        Args:
+            livestream_ids: List of internal livestream IDs
+        
+        Returns:
+            Dictionary mapping livestream_id to current viewer count
+        """
+        if not livestream_ids:
+            return {}
+        
+        # Subquery to get the latest timestamp for each livestream
+        latest_subq = (
+            select(
+                ViewershipHistory.livestream_id,
+                func.max(ViewershipHistory.timestamp).label('max_ts')
+            )
+            .where(ViewershipHistory.livestream_id.in_(livestream_ids))
+            .group_by(ViewershipHistory.livestream_id)
+            .subquery()
+        )
+        
+        # Get the viewcount from the latest record for each livestream
+        stmt = (
+            select(ViewershipHistory.livestream_id, ViewershipHistory.viewcount)
+            .join(
+                latest_subq,
+                (ViewershipHistory.livestream_id == latest_subq.c.livestream_id) &
+                (ViewershipHistory.timestamp == latest_subq.c.max_ts)
+            )
+        )
+        
+        result = await self.session.execute(stmt)
+        return {row.livestream_id: row.viewcount for row in result}
+    
+    async def get_current_viewers(self, livestream_id: int) -> Optional[int]:
+        """
+        Get the most recent viewer count for a single livestream.
+        
+        Args:
+            livestream_id: Internal livestream ID
+        
+        Returns:
+            Current viewer count or None if no history exists
+        """
+        viewers_map = await self.get_current_viewers_map([livestream_id])
+        return viewers_map.get(livestream_id)
     
     async def get_by_id(self, livestream_id: int) -> Optional[Livestream]:
         """
@@ -333,16 +397,16 @@ class LivestreamService:
     
     async def get_trending(self, count: int = 10) -> list[LivestreamRankedResponse]:
         """
-        Get trending livestreams with current viewer counts.
+        Get trending livestreams ranked by anomaly/trend score.
         
-        Queries the most recent viewership data and ranks streams
-        by current viewer count.
+        Uses anomaly detection to identify streams with unusual
+        viewership patterns (spikes) and ranks by trend score.
         
         Args:
             count: Number of items to return (max 100)
         
         Returns:
-            List of ranked livestreams with viewer data
+            List of ranked livestreams with viewer data and trend scores
         """
         # Check cache first
         cached = self.cache.get(CacheKeys.TRENDING_LIVESTREAMS)
@@ -350,53 +414,48 @@ class LivestreamService:
             # Return requested count from cached data
             return cached.data[:count]
         
-        # Subquery to get the latest viewership record for each livestream
-        latest_viewership_subq = (
-            select(
-                ViewershipHistory.livestream_id,
-                func.max(ViewershipHistory.timestamp).label("max_timestamp")
-            )
-            .group_by(ViewershipHistory.livestream_id)
-            .subquery()
+        # Get settings for anomaly configuration
+        settings = get_settings()
+        
+        # Configure anomaly detector
+        config = AnomalyConfig(
+            algorithm=getattr(settings, 'anomaly_algorithm', 'quantile'),
+            recent_window_minutes=getattr(settings, 'anomaly_recent_window_minutes', 15),
+            baseline_hours=getattr(settings, 'anomaly_baseline_hours', 24),
         )
         
-        # Main query joining livestreams with their latest viewership
-        stmt = (
-            select(
-                Livestream,
-                ViewershipHistory.viewcount.label("current_viewers")
-            )
-            .join(
-                latest_viewership_subq,
-                Livestream.id == latest_viewership_subq.c.livestream_id
-            )
-            .join(
-                ViewershipHistory,
-                (ViewershipHistory.livestream_id == latest_viewership_subq.c.livestream_id) &
-                (ViewershipHistory.timestamp == latest_viewership_subq.c.max_timestamp)
-            )
-            .where(Livestream.is_live == True)
-            .order_by(desc("current_viewers"))
-            .limit(100)  # Cache top 100
-        )
+        # Run anomaly detection
+        detector = AsyncAnomalyDetector(self.session, config)
+        scores = await detector.detect_all_live_streams(limit=100)
         
-        result = await self.session.execute(stmt)
-        rows = result.all()
-        
-        # Build ranked response
+        # Build ranked response from anomaly scores
         ranked_items = [
             LivestreamRankedResponse(
-                id=row.Livestream.public_id,
-                youtube_video_id=row.Livestream.youtube_video_id,
-                name=row.Livestream.name,
-                channel=row.Livestream.channel,
-                url=row.Livestream.url,
-                is_live=row.Livestream.is_live,
-                current_viewers=row.current_viewers or 0,
+                id=str(score.livestream_id),  # Will be replaced with public_id below
+                youtube_video_id=score.youtube_video_id,
+                name=score.name,
+                channel=score.channel,
+                url=f"https://www.youtube.com/watch?v={score.youtube_video_id}",
+                is_live=True,
+                current_viewers=score.current_viewcount or 0,
                 rank=idx + 1,
+                trend_score=round(score.score, 2),
             )
-            for idx, row in enumerate(rows)
+            for idx, score in enumerate(scores)
         ]
+        
+        # Fetch public_ids for the livestreams
+        if ranked_items:
+            livestream_ids = [score.livestream_id for score in scores]
+            stmt = select(Livestream.id, Livestream.public_id).where(
+                Livestream.id.in_(livestream_ids)
+            )
+            result = await self.session.execute(stmt)
+            id_map = {row.id: str(row.public_id) for row in result}
+            
+            # Update the ranked items with public_ids
+            for item, score in zip(ranked_items, scores):
+                item.id = id_map.get(score.livestream_id, item.id)
         
         # Cache the results
         self.cache.set(CacheKeys.TRENDING_LIVESTREAMS, ranked_items)

@@ -218,19 +218,11 @@ export const Dashboard: React.FC = () => {
                   className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors"
                 >
                   <div className="w-20 h-12 rounded overflow-hidden bg-gray-200 flex-shrink-0">
-                    {stream.thumbnail_url ? (
-                      <img
-                        src={stream.thumbnail_url}
-                        alt={stream.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                    )}
+                    <img
+                      src={`https://img.youtube.com/vi/${stream.youtube_video_id}/mqdefault.jpg`}
+                      alt={stream.name}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{stream.name}</p>

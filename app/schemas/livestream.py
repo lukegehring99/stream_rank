@@ -130,6 +130,8 @@ class LivestreamResponse(BaseModel):
     description: Optional[str] = Field(None, description="Stream description")
     url: str = Field(..., description="Full YouTube URL")
     is_live: bool = Field(..., description="Currently streaming")
+    current_viewers: Optional[int] = Field(None, description="Current viewer count")
+    peak_viewers: int = Field(0, description="Peak viewer count")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     
@@ -147,6 +149,7 @@ class LivestreamRankedResponse(BaseModel):
     is_live: bool = Field(..., description="Currently streaming")
     current_viewers: int = Field(..., description="Current viewer count")
     rank: int = Field(..., description="Rank position (1-based)")
+    trend_score: Optional[float] = Field(None, description="Anomaly/trend score (0-100)")
     
     model_config = {"from_attributes": True, "populate_by_name": True}
 

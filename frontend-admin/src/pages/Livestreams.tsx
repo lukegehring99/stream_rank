@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { format } from 'date-fns';
 import { DataTable, Pagination, DeleteModal } from '../components';
 import { useLivestreams, useDeleteLivestream } from '../hooks';
 import { Livestream } from '../types';
@@ -82,6 +81,11 @@ export const Livestreams: React.FC = () => {
     return count.toLocaleString();
   };
 
+  // Parse UTC timestamp (backend returns timestamps without Z suffix)
+  const parseUTC = (timestamp: string) => {
+    return new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
+  };
+
   // Table columns
   const columns = useMemo(
     () => [
@@ -91,19 +95,11 @@ export const Livestreams: React.FC = () => {
         className: 'w-24',
         render: (stream: Livestream) => (
           <div className="w-20 h-12 rounded overflow-hidden bg-gray-200">
-            {stream.thumbnail_url ? (
-              <img
-                src={stream.thumbnail_url}
-                alt={stream.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </div>
-            )}
+            <img
+              src={`https://img.youtube.com/vi/${stream.youtube_video_id}/mqdefault.jpg`}
+              alt={stream.name}
+              className="w-full h-full object-cover"
+            />
           </div>
         ),
       },
@@ -156,7 +152,11 @@ export const Livestreams: React.FC = () => {
         sortable: true,
         render: (stream: Livestream) => (
           <span className="text-gray-600">
-            {format(new Date(stream.created_at), 'MMM d, yyyy')}
+            {parseUTC(stream.created_at).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
           </span>
         ),
       },
@@ -246,7 +246,7 @@ export const Livestreams: React.FC = () => {
                   placeholder="Search by title or channel..."
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  className="form-input pl-10"
+                  className="form-input !pl-12"
                 />
                 <svg
                   className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"

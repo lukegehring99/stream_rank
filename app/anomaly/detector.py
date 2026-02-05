@@ -6,11 +6,13 @@ High-level interface for running anomaly detection across multiple
 livestreams. Handles data fetching, batch processing, and ranking.
 
 This module provides:
-- AnomalyDetector class for stateful detection
+- AnomalyDetector class for sync stateful detection
+- AsyncAnomalyDetector class for async detection (FastAPI compatible)
 - detect_anomalies() convenience function for one-shot detection
 - Integration with SQLAlchemy session and models
 
 Usage:
+    # Sync usage
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
     from app.anomaly import AnomalyDetector, AnomalyConfig
@@ -23,13 +25,22 @@ Usage:
         
         for score in rankings[:10]:
             print(f"{score.livestream_id}: {score.score:.1f} ({score.status})")
+    
+    # Async usage (FastAPI)
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from app.anomaly import AsyncAnomalyDetector
+    
+    async def get_rankings(session: AsyncSession):
+        detector = AsyncAnomalyDetector(session)
+        return await detector.detect_all_live_streams()
 """
 
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional, Union
 import numpy as np
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.anomaly.config import AnomalyConfig
 from app.anomaly.factory import AnomalyStrategyFactory
@@ -348,3 +359,222 @@ def detect_anomalies(
     
     # For non-live: get all streams (implement if needed)
     return detector.detect_all_live_streams()
+
+
+class AsyncAnomalyDetector:
+    """
+    Async version of AnomalyDetector for use with FastAPI and AsyncSession.
+    
+    Provides the same detection capabilities as AnomalyDetector but with
+    async/await support for non-blocking database operations.
+    
+    Attributes:
+        session: Async SQLAlchemy database session
+        config: Detection configuration
+        strategy: Detection algorithm strategy
+    
+    Example:
+        async def get_rankings(session: AsyncSession):
+            detector = AsyncAnomalyDetector(session)
+            scores = await detector.detect_all_live_streams()
+            return scores[:10]
+    """
+    
+    def __init__(
+        self,
+        session: AsyncSession,
+        config: Optional[AnomalyConfig] = None,
+        strategy: Optional[AnomalyStrategy] = None,
+    ):
+        """
+        Initialize the async anomaly detector.
+        
+        Args:
+            session: AsyncSession for async database access
+            config: Detection configuration (defaults used if None)
+            strategy: Detection strategy (created from config if None)
+        """
+        self.session = session
+        self.config = config or AnomalyConfig()
+        self.strategy = strategy or AnomalyStrategyFactory.create(self.config)
+    
+    async def detect_all_live_streams(
+        self,
+        limit: Optional[int] = None,
+    ) -> List[AnomalyScore]:
+        """
+        Run anomaly detection for all currently live streams.
+        
+        Returns a ranked list of streams sorted by anomaly score
+        (highest first).
+        
+        Args:
+            limit: Optional maximum number of results
+        
+        Returns:
+            List of AnomalyScore objects sorted by score descending
+        """
+        # Get all live streams
+        result = await self.session.execute(
+            select(Livestream).where(Livestream.is_live == True)
+        )
+        live_streams = result.scalars().all()
+        
+        # Run detection for each
+        scores = []
+        for stream in live_streams:
+            score = await self.detect_for_stream(stream)
+            scores.append(score)
+        
+        # Sort by score descending
+        scores.sort(key=lambda s: s.score, reverse=True)
+        
+        if limit:
+            scores = scores[:limit]
+        
+        return scores
+    
+    async def detect_for_stream(
+        self,
+        livestream: Livestream,
+    ) -> AnomalyScore:
+        """
+        Run anomaly detection for a single stream.
+        
+        Args:
+            livestream: Livestream model instance
+        
+        Returns:
+            AnomalyScore with detection result
+        """
+        now = datetime.now(timezone.utc)
+        recent_start = now - timedelta(minutes=self.config.recent_window_minutes)
+        baseline_start = now - timedelta(hours=self.config.baseline_hours)
+        
+        # Fetch all viewership data
+        all_data = await self._fetch_viewership_data(
+            livestream=livestream,
+            start_time=baseline_start,
+            end_time=now,
+        )
+        
+        # Check for inactive stream (no data)
+        if all_data.is_empty:
+            return AnomalyScore(
+                livestream_id=livestream.id,
+                youtube_video_id=livestream.youtube_video_id,
+                name=livestream.name,
+                channel=livestream.channel,
+                score=0.0,
+                status=AnomalyStatus.INACTIVE,
+                algorithm=self.strategy.name,
+                metadata={'reason': 'No viewership data found'},
+            )
+        
+        # Split into recent and baseline windows
+        recent_cutoff = np.datetime64(recent_start, 'us')
+        baseline_end = np.datetime64(recent_start, 'us')
+        baseline_begin = np.datetime64(baseline_start, 'us')
+        
+        recent_data = all_data.slice_recent(recent_cutoff)
+        baseline_data = all_data.slice_baseline(baseline_begin, baseline_end)
+        
+        # Run detection strategy
+        score = self.strategy.compute_score(recent_data, baseline_data)
+        
+        # Enrich with stream metadata
+        score.name = livestream.name
+        score.channel = livestream.channel
+        score.last_updated = all_data.latest_timestamp
+        score.current_viewcount = all_data.latest_viewcount
+        
+        return score
+    
+    async def _fetch_viewership_data(
+        self,
+        livestream: Livestream,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> ViewershipData:
+        """
+        Fetch viewership history from database asynchronously.
+        
+        Args:
+            livestream: Livestream model instance
+            start_time: Start of time range
+            end_time: End of time range
+        
+        Returns:
+            ViewershipData containing time-series data
+        """
+        stmt = (
+            select(ViewershipHistory.timestamp, ViewershipHistory.viewcount)
+            .where(
+                and_(
+                    ViewershipHistory.livestream_id == livestream.id,
+                    ViewershipHistory.timestamp >= start_time,
+                    ViewershipHistory.timestamp <= end_time,
+                )
+            )
+            .order_by(ViewershipHistory.timestamp)
+        )
+        
+        result = await self.session.execute(stmt)
+        rows = result.fetchall()
+        
+        if not rows:
+            return ViewershipData(
+                livestream_id=livestream.id,
+                youtube_video_id=livestream.youtube_video_id,
+                name=livestream.name,
+                channel=livestream.channel,
+                timestamps=np.array([], dtype='datetime64[us]'),
+                viewcounts=np.array([], dtype=np.int64),
+            )
+        
+        timestamps = np.array(
+            [r[0] for r in rows],
+            dtype='datetime64[us]'
+        )
+        viewcounts = np.array(
+            [r[1] for r in rows],
+            dtype=np.int64
+        )
+        
+        return ViewershipData(
+            livestream_id=livestream.id,
+            youtube_video_id=livestream.youtube_video_id,
+            name=livestream.name,
+            channel=livestream.channel,
+            timestamps=timestamps,
+            viewcounts=viewcounts,
+        )
+
+
+async def detect_anomalies_async(
+    session: AsyncSession,
+    strategy: Optional[AnomalyStrategy] = None,
+    config: Optional[AnomalyConfig] = None,
+    limit: Optional[int] = None,
+) -> List[AnomalyScore]:
+    """
+    Async convenience function for one-shot anomaly detection.
+    
+    Creates an async detector and runs detection for all live streams.
+    
+    Args:
+        session: AsyncSession for async database access
+        strategy: Detection strategy (created from config if None)
+        config: Detection configuration (defaults if None)
+        limit: Maximum number of results to return
+    
+    Returns:
+        List of AnomalyScores ranked by score (highest first)
+    
+    Example:
+        async with AsyncSession(engine) as session:
+            rankings = await detect_anomalies_async(session, limit=10)
+    """
+    config = config or AnomalyConfig()
+    detector = AsyncAnomalyDetector(session, config, strategy)
+    return await detector.detect_all_live_streams(limit=limit)

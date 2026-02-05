@@ -137,6 +137,14 @@ class PollTask:
                             livestream.channel = stats.channel_title
                             logger.info(f"Updated stream channel: {stats.channel_title}")
                         
+                        # Update peak_viewers if current viewcount exceeds it
+                        if stats.view_count > livestream.peak_viewers:
+                            livestream.peak_viewers = stats.view_count
+                            logger.debug(f"New peak viewers for {livestream.name}: {stats.view_count}")
+                        
+                        # Explicitly update updated_at timestamp
+                        livestream.updated_at = now
+                        
                         # Insert viewership history record
                         history = ViewershipHistory(
                             livestream_id=livestream.id,
