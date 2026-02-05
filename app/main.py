@@ -32,6 +32,7 @@ from fastapi.exceptions import RequestValidationError
 from app.config import get_settings
 from app.db import init_database, close_database
 from app.api import public_router, admin_router, auth_router
+from app.services.user_service import sync_user_passwords
 
 
 @asynccontextmanager
@@ -50,6 +51,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     
     await init_database()
     print("Database connection initialized")
+    
+    # Sync user passwords from environment variables
+    await sync_user_passwords()
+    print("User passwords synchronized from environment")
     
     yield
     

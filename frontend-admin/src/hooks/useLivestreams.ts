@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { livestreamsApi, extractVideoId } from '../api/client';
+import { livestreamsApi } from '../api/client';
 import { Livestream, LivestreamFilters, LivestreamUpdate, PaginatedResponse } from '../types';
 import toast from 'react-hot-toast';
 
@@ -62,8 +62,7 @@ export const useCreateLivestream = () => {
 
   return useMutation({
     mutationFn: (urlOrId: string) => {
-      const videoId = extractVideoId(urlOrId);
-      return livestreamsApi.create({ youtube_video_id: videoId, name: 'Loading...', channel: 'Loading...' });
+      return livestreamsApi.create({ youtube_url: urlOrId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: livestreamKeys.lists() });

@@ -94,6 +94,22 @@ class Settings(BaseSettings):
     )
     
     # =========================================================================
+    # User Password Settings (for startup sync)
+    # =========================================================================
+    admin_password: Optional[str] = Field(
+        default=None,
+        min_length=8,
+        description="Admin user password (synced on startup)",
+        alias="ADMIN_PASSWORD",
+    )
+    moderator_password: Optional[str] = Field(
+        default=None,
+        min_length=8,
+        description="Moderator user password (synced on startup)",
+        alias="MODERATOR_PASSWORD",
+    )
+    
+    # =========================================================================
     # Cache Settings
     # =========================================================================
     cache_ttl_seconds: int = Field(

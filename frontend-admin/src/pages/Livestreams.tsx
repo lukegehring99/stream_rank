@@ -135,7 +135,7 @@ export const Livestreams: React.FC = () => {
         header: 'Viewers',
         sortable: true,
         render: (stream: Livestream) => (
-          <span className="font-medium">{stream.current_viewers !== undefined ? formatViewers(stream.current_viewers) : '-'}</span>
+          <span className="font-medium">{stream.current_viewers != null ? formatViewers(stream.current_viewers) : '-'}</span>
         ),
       },
       {
@@ -143,7 +143,7 @@ export const Livestreams: React.FC = () => {
         header: 'Peak',
         sortable: true,
         render: (stream: Livestream) => (
-          <span className="text-gray-600">{stream.peak_viewers !== undefined ? formatViewers(stream.peak_viewers) : '-'}</span>
+          <span className="text-gray-600">{stream.peak_viewers != null ? formatViewers(stream.peak_viewers) : '-'}</span>
         ),
       },
       {

@@ -41,71 +41,49 @@ class LivestreamBase(BaseModel):
 class LivestreamCreate(BaseModel):
     """Schema for creating a new livestream."""
     
+    youtube_url: str = Field(
+        ...,
+        description="YouTube video URL or video ID",
+        examples=["https://www.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"],
+    )
+    
+    # These fields are populated from YouTube API, not provided by user
     youtube_video_id: Optional[str] = Field(
         default=None,
-        min_length=11,
-        max_length=11,
-        description="YouTube video ID (11 characters)",
-        examples=["dQw4w9WgXcQ"],
+        description="Extracted YouTube video ID (auto-populated)",
     )
-    youtube_url: Optional[str] = Field(
+    name: Optional[str] = Field(
         default=None,
-        description="YouTube video URL (alternative to video ID)",
-        examples=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"],
+        description="Livestream title (auto-populated from YouTube)",
     )
-    name: str = Field(
-        ...,
-        min_length=1,
-        max_length=255,
-        description="Livestream title",
-        examples=["Live Science Experiment #42"],
-    )
-    channel: str = Field(
-        ...,
-        min_length=1,
-        max_length=255,
-        description="Channel name",
-        examples=["ScienceChannel"],
+    channel: Optional[str] = Field(
+        default=None,
+        description="Channel name (auto-populated from YouTube)",
     )
     description: Optional[str] = Field(
         default=None,
         description="Stream description",
     )
-    is_live: bool = Field(
-        default=False,
-        description="Whether the stream is currently live",
+    is_live: Optional[bool] = Field(
+        default=None,
+        description="Whether the stream is currently live (auto-populated from YouTube)",
     )
     
-    @field_validator("youtube_video_id")
-    @classmethod
-    def validate_video_id(cls, v: Optional[str]) -> Optional[str]:
-        """Validate YouTube video ID format."""
-        if v is None:
-            return v
-        if not re.match(r"^[a-zA-Z0-9_-]{11}$", v):
-            raise ValueError("Invalid YouTube video ID format")
-        return v
-    
     @model_validator(mode="after")
-    def validate_youtube_input(self) -> "LivestreamCreate":
-        """Ensure either video ID or URL is provided, and extract ID from URL."""
-        if self.youtube_video_id is None and self.youtube_url is None:
-            raise ValueError("Either youtube_video_id or youtube_url must be provided")
-        
-        if self.youtube_url and self.youtube_video_id is None:
-            # Extract video ID from URL
+    def extract_video_id(self) -> "LivestreamCreate":
+        """Extract video ID from URL if not already set."""
+        if self.youtube_video_id is None:
             video_id = self._extract_video_id(self.youtube_url)
             if video_id is None:
                 raise ValueError("Could not extract video ID from YouTube URL")
             self.youtube_video_id = video_id
-        
         return self
     
     @staticmethod
     def _extract_video_id(url: str) -> Optional[str]:
         """Extract YouTube video ID from various URL formats."""
         patterns = [
-            r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/v/)([a-zA-Z0-9_-]{11})",
+            r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/v/|youtube\.com/live/)([a-zA-Z0-9_-]{11})",
             r"^([a-zA-Z0-9_-]{11})$",  # Just the video ID
         ]
         for pattern in patterns:

@@ -16,12 +16,7 @@ export interface Livestream {
 }
 
 export interface LivestreamCreate {
-  youtube_video_id?: string;
-  youtube_url?: string;
-  name: string;
-  channel: string;
-  description?: string;
-  is_live?: boolean;
+  youtube_url: string;
 }
 
 export interface LivestreamUpdate {

@@ -297,6 +297,8 @@ async def get_viewership_history(
     livestream_id: str,
     current_user: CurrentUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    page_size: Annotated[int, Query(ge=1, le=1000, description="Items per page")] = 50,
     start_time: Annotated[
         Optional[datetime],
         Query(description="Start of time range (ISO 8601 format)"),
@@ -305,27 +307,24 @@ async def get_viewership_history(
         Optional[datetime],
         Query(description="End of time range (ISO 8601 format)"),
     ] = None,
-    limit: Annotated[
-        int,
-        Query(ge=1, le=10000, description="Maximum records to return"),
-    ] = 1000,
 ) -> ViewershipHistoryListResponse:
     """
     Get viewership history for a livestream.
     
-    Returns time-series data of viewer counts within the specified
-    time range. Defaults to last 24 hours if no range specified.
+    Returns paginated time-series data of viewer counts. Optionally filter
+    by time range. Returns all history if no time range specified.
     
     Requires admin authentication.
     
     Args:
         livestream_id: Livestream public ID (UUID)
-        start_time: Start of time range (default: 24 hours ago)
-        end_time: End of time range (default: now)
-        limit: Maximum records to return
+        page: Page number (1-based)
+        page_size: Items per page (1-1000)
+        start_time: Optional start of time range
+        end_time: Optional end of time range
     
     Returns:
-        List of viewership history records
+        Paginated list of viewership history records
     
     Raises:
         HTTPException: 404 if livestream not found
@@ -340,22 +339,24 @@ async def get_viewership_history(
             detail=f"Livestream with ID {livestream_id} not found",
         )
     
+    skip = (page - 1) * page_size
     history, total = await service.get_viewership_history(
         livestream_id=livestream.id,  # Use internal ID for DB query
         start_time=start_time,
         end_time=end_time,
-        limit=limit,
+        skip=skip,
+        limit=page_size,
     )
     
-    # Determine actual time range used
-    actual_end = end_time or datetime.now(timezone.utc)
-    from datetime import timedelta
-    actual_start = start_time or (actual_end - timedelta(hours=24))
+    total_pages = (total + page_size - 1) // page_size
     
     return ViewershipHistoryListResponse(
         items=history,
         total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
         livestream_id=livestream_id,  # Return public ID
-        start_time=actual_start,
-        end_time=actual_end,
+        start_time=start_time,
+        end_time=end_time,
     )

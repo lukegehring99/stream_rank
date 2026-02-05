@@ -68,7 +68,7 @@ export const livestreamsApi = {
     return response.data;
   },
 
-  create: async (data: { youtube_video_id?: string; youtube_url?: string; name: string; channel: string }) => {
+  create: async (data: { youtube_url: string }) => {
     const response = await apiClient.post('/admin/livestreams', data);
     return response.data;
   },

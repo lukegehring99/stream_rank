@@ -21,6 +21,7 @@ from app.schemas import (
     LivestreamRankedResponse,
 )
 from app.services.cache_service import get_cache_service, CacheKeys
+from app.services.youtube_service import get_youtube_service, YouTubeValidationError
 
 
 class LivestreamService:
@@ -197,14 +198,16 @@ class LivestreamService:
         """
         Create a new livestream.
         
+        Fetches video metadata from YouTube API before creating.
+        
         Args:
-            data: Livestream creation data
+            data: Livestream creation data (only youtube_url required)
         
         Returns:
-            Created livestream
+            Created livestream with metadata from YouTube
         
         Raises:
-            ValueError: If YouTube video ID already exists
+            ValueError: If YouTube video ID already exists or video not found
         """
         # Check for existing video ID
         existing = await self.get_by_youtube_id(data.youtube_video_id)
@@ -213,16 +216,40 @@ class LivestreamService:
                 f"Livestream with YouTube ID '{data.youtube_video_id}' already exists"
             )
         
+        # Fetch metadata from YouTube API
+        youtube_service = get_youtube_service()
+        video_info = None
+        
+        try:
+            video_info = await youtube_service.validate_video_exists(data.youtube_video_id)
+        except YouTubeValidationError as e:
+            raise ValueError(str(e))
+        
+        # Use YouTube metadata if available, otherwise require user-provided data
+        if video_info:
+            name = video_info.title
+            channel = video_info.channel_title
+            is_live = video_info.is_live
+        else:
+            # YouTube API not configured - require name and channel from request
+            if not data.name or not data.channel:
+                raise ValueError(
+                    "YouTube API key not configured. Please provide name and channel manually."
+                )
+            name = data.name
+            channel = data.channel
+            is_live = data.is_live if data.is_live is not None else False
+        
         # Build URL from video ID
         url = f"https://www.youtube.com/watch?v={data.youtube_video_id}"
         
         livestream = Livestream(
             youtube_video_id=data.youtube_video_id,
-            name=data.name,
-            channel=data.channel,
+            name=name,
+            channel=channel,
             description=data.description,
             url=url,
-            is_live=data.is_live,
+            is_live=is_live,
         )
         
         self.session.add(livestream)
@@ -348,32 +375,30 @@ class LivestreamService:
         livestream_id: int,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-        limit: int = 1000,
+        skip: int = 0,
+        limit: int = 50,
     ) -> tuple[list[ViewershipHistory], int]:
         """
         Get viewership history for a livestream.
         
         Args:
             livestream_id: Livestream ID
-            start_time: Start of time range (default: 24 hours ago)
-            end_time: End of time range (default: now)
-            limit: Maximum records to return
+            start_time: Start of time range (optional, no default - returns all if not set)
+            end_time: End of time range (optional, no default - returns all if not set)
+            skip: Number of records to skip (for pagination)
+            limit: Maximum records to return per page
         
         Returns:
             Tuple of (history records, total count)
         """
-        # Default time range: last 24 hours
-        if end_time is None:
-            end_time = datetime.now(timezone.utc)
-        if start_time is None:
-            start_time = end_time - timedelta(hours=24)
+        # Build query filters
+        base_filter = [ViewershipHistory.livestream_id == livestream_id]
         
-        # Build query
-        base_filter = [
-            ViewershipHistory.livestream_id == livestream_id,
-            ViewershipHistory.timestamp >= start_time,
-            ViewershipHistory.timestamp <= end_time,
-        ]
+        # Only add time filters if explicitly provided
+        if start_time is not None:
+            base_filter.append(ViewershipHistory.timestamp >= start_time)
+        if end_time is not None:
+            base_filter.append(ViewershipHistory.timestamp <= end_time)
         
         # Get total count
         count_stmt = (
@@ -383,11 +408,12 @@ class LivestreamService:
         )
         total = await self.session.scalar(count_stmt) or 0
         
-        # Get records
+        # Get records with pagination
         stmt = (
             select(ViewershipHistory)
             .where(*base_filter)
             .order_by(ViewershipHistory.timestamp.desc())
+            .offset(skip)
             .limit(limit)
         )
         result = await self.session.execute(stmt)

@@ -30,6 +30,9 @@ class ViewershipHistoryListResponse(BaseModel):
         description="List of viewership history entries"
     )
     total: int = Field(..., description="Total number of entries")
+    page: int = Field(1, description="Current page number")
+    page_size: int = Field(50, description="Items per page")
+    total_pages: int = Field(1, description="Total number of pages")
     livestream_id: str = Field(..., description="Livestream public ID (UUID)")
     start_time: Optional[datetime] = Field(
         None, 

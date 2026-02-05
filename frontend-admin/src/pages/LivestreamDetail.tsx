@@ -271,13 +271,13 @@ export const LivestreamDetail: React.FC = () => {
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-500">Current Viewers</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {stream.current_viewers !== undefined ? formatViewers(stream.current_viewers) : '-'}
+                  {stream.current_viewers != null ? formatViewers(stream.current_viewers) : '-'}
                 </p>
               </div>
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-500">Peak Viewers</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {stream.peak_viewers !== undefined ? formatViewers(stream.peak_viewers) : '-'}
+                  {stream.peak_viewers != null ? formatViewers(stream.peak_viewers) : '-'}
                 </p>
               </div>
               <div className="p-4 bg-gray-50 rounded-lg">

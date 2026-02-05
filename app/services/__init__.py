@@ -21,6 +21,7 @@ from .youtube_service import (
     YouTubeValidationError,
     get_youtube_service,
 )
+from .user_service import sync_user_passwords
 
 __all__ = [
     "CacheService",
@@ -33,4 +34,5 @@ __all__ = [
     "YouTubeVideoInfo",
     "YouTubeValidationError",
     "get_youtube_service",
+    "sync_user_passwords",
 ]
