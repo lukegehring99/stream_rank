@@ -380,3 +380,89 @@ class TestViewershipHistory:
         )
         
         assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_get_history_with_downsample_1m(
+        self,
+        async_client: AsyncClient,
+        auth_headers: dict,
+        sample_livestream: Livestream,
+        sample_viewership: list[ViewershipHistory],
+    ):
+        """Should return downsampled history with 1m interval."""
+        response = await async_client.get(
+            f"/api/v1/admin/livestreams/{sample_livestream.public_id}/history",
+            headers=auth_headers,
+            params={"downsample": "1m"},
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "items" in data
+        assert "downsample" in data
+        assert data["downsample"] == "1m"
+        # Downsampled items should have string IDs with suffix
+        if len(data["items"]) > 0:
+            assert "_1m" in str(data["items"][0]["id"])
+
+    @pytest.mark.asyncio
+    async def test_get_history_with_downsample_5m(
+        self,
+        async_client: AsyncClient,
+        auth_headers: dict,
+        sample_livestream: Livestream,
+        sample_viewership: list[ViewershipHistory],
+    ):
+        """Should return downsampled history with 5m interval."""
+        response = await async_client.get(
+            f"/api/v1/admin/livestreams/{sample_livestream.public_id}/history",
+            headers=auth_headers,
+            params={"downsample": "5m"},
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "items" in data
+        assert "downsample" in data
+        assert data["downsample"] == "5m"
+        # Downsampled items should have string IDs with suffix
+        if len(data["items"]) > 0:
+            assert "_5m" in str(data["items"][0]["id"])
+
+    @pytest.mark.asyncio
+    async def test_get_history_with_downsample_1hr(
+        self,
+        async_client: AsyncClient,
+        auth_headers: dict,
+        sample_livestream: Livestream,
+        sample_viewership: list[ViewershipHistory],
+    ):
+        """Should return downsampled history with 1hr interval."""
+        response = await async_client.get(
+            f"/api/v1/admin/livestreams/{sample_livestream.public_id}/history",
+            headers=auth_headers,
+            params={"downsample": "1hr"},
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert data["downsample"] == "1hr"
+
+    @pytest.mark.asyncio
+    async def test_get_history_invalid_downsample(
+        self,
+        async_client: AsyncClient,
+        auth_headers: dict,
+        sample_livestream: Livestream,
+    ):
+        """Should reject invalid downsample values."""
+        response = await async_client.get(
+            f"/api/v1/admin/livestreams/{sample_livestream.public_id}/history",
+            headers=auth_headers,
+            params={"downsample": "invalid"},
+        )
+        
+        assert response.status_code == 422  # Validation error

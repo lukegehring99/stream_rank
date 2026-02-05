@@ -22,6 +22,9 @@ from .livestream import (
 from .viewership import (
     ViewershipHistoryResponse,
     ViewershipHistoryListResponse,
+    DownsampleInterval,
+    DownsampledViewershipResponse,
+    DOWNSAMPLE_SECONDS,
 )
 from .common import (
     HealthResponse,
@@ -46,6 +49,9 @@ __all__ = [
     # Viewership
     "ViewershipHistoryResponse",
     "ViewershipHistoryListResponse",
+    "DownsampleInterval",
+    "DownsampledViewershipResponse",
+    "DOWNSAMPLE_SECONDS",
     # Common
     "HealthResponse",
     "ErrorResponse",

@@ -83,7 +83,13 @@ export const livestreamsApi = {
     return response.data;
   },
 
-  getHistory: async (id: string, params?: { page?: number; page_size?: number }) => {
+  getHistory: async (id: string, params?: { 
+    page?: number; 
+    page_size?: number;
+    start_time?: string;
+    end_time?: string;
+    downsample?: '1m' | '5m' | '10m' | '1hr';
+  }) => {
     const response = await apiClient.get(`/admin/livestreams/${id}/history`, { params });
     return response.data;
   },

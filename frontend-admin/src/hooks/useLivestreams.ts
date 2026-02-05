@@ -38,12 +38,66 @@ export const useLivestream = (id: string) => {
   });
 };
 
+// Viewership history item type
+export interface ViewershipHistoryItem {
+  id: number | string;
+  livestream_id: number;
+  timestamp: string;
+  viewcount: number;
+}
+
+// Viewership history response type
+export interface ViewershipHistoryResponse {
+  items: ViewershipHistoryItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  livestream_id: string;
+  start_time?: string;
+  end_time?: string;
+  downsample?: '1m' | '5m' | '10m' | '1hr';
+}
+
 // Fetch viewership history
-export const useViewershipHistory = (id: string, page: number = 1, pageSize: number = 100) => {
-  return useQuery<{ items: Array<{ id: number; livestream_id: number; timestamp: string; viewcount: number }>; total: number }>({
-    queryKey: [...livestreamKeys.history(id), page, pageSize],
-    queryFn: () => livestreamsApi.getHistory(id, { page, page_size: pageSize }),
+export const useViewershipHistory = (
+  id: string, 
+  page: number = 1, 
+  pageSize: number = 100,
+  options?: {
+    startTime?: string;
+    endTime?: string;
+    downsample?: '1m' | '5m' | '10m' | '1hr';
+  }
+) => {
+  return useQuery<ViewershipHistoryResponse>({
+    queryKey: [...livestreamKeys.history(id), page, pageSize, options?.startTime, options?.endTime, options?.downsample],
+    queryFn: () => livestreamsApi.getHistory(id, { 
+      page, 
+      page_size: pageSize,
+      start_time: options?.startTime,
+      end_time: options?.endTime,
+      downsample: options?.downsample,
+    }),
     enabled: !!id,
+  });
+};
+
+// Fetch downsampled viewership history (for overview chart)
+export const useDownsampledViewershipHistory = (
+  id: string,
+  downsample: '1m' | '5m' | '10m' | '1hr' = '1hr',
+  limit: number = 3000
+) => {
+  return useQuery<ViewershipHistoryResponse>({
+    queryKey: [...livestreamKeys.history(id), 'downsampled', downsample, limit],
+    queryFn: () => livestreamsApi.getHistory(id, { 
+      page: 1, 
+      page_size: limit,
+      downsample,
+    }),
+    enabled: !!id,
+    staleTime: 60000, // 1 minute - downsampled data changes less frequently
   });
 };
 

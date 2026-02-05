@@ -20,6 +20,7 @@ from app.schemas import (
     LivestreamListResponse,
     ViewershipHistoryListResponse,
     DashboardStats,
+    DownsampleInterval,
 )
 from app.services import LivestreamService
 
@@ -291,14 +292,14 @@ async def delete_livestream(
     "/livestreams/{livestream_id}/history",
     response_model=ViewershipHistoryListResponse,
     summary="Get Viewership History",
-    description="Get viewership history for a specific livestream.",
+    description="Get viewership history for a specific livestream. Supports optional downsampling for large time ranges.",
 )
 async def get_viewership_history(
     livestream_id: str,
     current_user: CurrentUser,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     page: Annotated[int, Query(ge=1, description="Page number")] = 1,
-    page_size: Annotated[int, Query(ge=1, le=1000, description="Items per page")] = 50,
+    page_size: Annotated[int, Query(ge=1, le=3000, description="Items per page")] = 50,
     start_time: Annotated[
         Optional[datetime],
         Query(description="Start of time range (ISO 8601 format)"),
@@ -307,12 +308,20 @@ async def get_viewership_history(
         Optional[datetime],
         Query(description="End of time range (ISO 8601 format)"),
     ] = None,
+    downsample: Annotated[
+        Optional[DownsampleInterval],
+        Query(description="Downsample interval: 5m, 10m, or 1hr. Returns averaged data per time bin."),
+    ] = None,
 ) -> ViewershipHistoryListResponse:
     """
     Get viewership history for a livestream.
     
     Returns paginated time-series data of viewer counts. Optionally filter
     by time range. Returns all history if no time range specified.
+    
+    When downsample is specified, data is aggregated into time bins and
+    the average viewer count is returned. This is useful for viewing
+    long time ranges without overwhelming the UI with raw data points.
     
     Requires admin authentication.
     
@@ -322,6 +331,7 @@ async def get_viewership_history(
         page_size: Items per page (1-1000)
         start_time: Optional start of time range
         end_time: Optional end of time range
+        downsample: Optional downsampling interval (5m, 10m, 1hr)
     
     Returns:
         Paginated list of viewership history records
@@ -346,6 +356,7 @@ async def get_viewership_history(
         end_time=end_time,
         skip=skip,
         limit=page_size,
+        downsample=downsample,
     )
     
     total_pages = (total + page_size - 1) // page_size
@@ -359,4 +370,5 @@ async def get_viewership_history(
         livestream_id=livestream_id,  # Return public ID
         start_time=start_time,
         end_time=end_time,
+        downsample=downsample,
     )

@@ -6,9 +6,9 @@ Business logic for livestream operations.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Union
 
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.anomaly import AsyncAnomalyDetector, AnomalyConfig
@@ -19,6 +19,9 @@ from app.schemas import (
     LivestreamUpdate,
     LivestreamResponse,
     LivestreamRankedResponse,
+    DownsampleInterval,
+    DownsampledViewershipResponse,
+    DOWNSAMPLE_SECONDS,
 )
 from app.services.cache_service import get_cache_service, CacheKeys
 from app.services.youtube_service import get_youtube_service, YouTubeValidationError
@@ -377,7 +380,8 @@ class LivestreamService:
         end_time: Optional[datetime] = None,
         skip: int = 0,
         limit: int = 50,
-    ) -> tuple[list[ViewershipHistory], int]:
+        downsample: Optional[DownsampleInterval] = None,
+    ) -> tuple[list[Union[ViewershipHistory, DownsampledViewershipResponse]], int]:
         """
         Get viewership history for a livestream.
         
@@ -387,6 +391,7 @@ class LivestreamService:
             end_time: End of time range (optional, no default - returns all if not set)
             skip: Number of records to skip (for pagination)
             limit: Maximum records to return per page
+            downsample: Optional downsampling interval (5m, 10m, 1hr)
         
         Returns:
             Tuple of (history records, total count)
@@ -399,6 +404,16 @@ class LivestreamService:
             base_filter.append(ViewershipHistory.timestamp >= start_time)
         if end_time is not None:
             base_filter.append(ViewershipHistory.timestamp <= end_time)
+        
+        if downsample is not None:
+            # Downsampled query with time binning
+            return await self._get_downsampled_history(
+                livestream_id=livestream_id,
+                base_filter=base_filter,
+                skip=skip,
+                limit=limit,
+                downsample=downsample,
+            )
         
         # Get total count
         count_stmt = (
@@ -418,6 +433,82 @@ class LivestreamService:
         )
         result = await self.session.execute(stmt)
         history = list(result.scalars().all())
+        
+        return history, total
+    
+    async def _get_downsampled_history(
+        self,
+        livestream_id: int,
+        base_filter: list,
+        skip: int,
+        limit: int,
+        downsample: DownsampleInterval,
+    ) -> tuple[list[DownsampledViewershipResponse], int]:
+        """
+        Get downsampled viewership history using time binning.
+        
+        Aggregates raw data into time bins (5m, 10m, 1hr) and returns
+        the average viewcount per bin.
+        
+        Args:
+            livestream_id: Livestream ID
+            base_filter: Pre-built filter conditions
+            skip: Number of bins to skip
+            limit: Maximum bins to return
+            downsample: Downsampling interval
+        
+        Returns:
+            Tuple of (downsampled records, total bin count)
+        """
+        interval_seconds = DOWNSAMPLE_SECONDS[downsample]
+        interval_suffix = downsample.value
+        
+        # Build the time bin expression using UNIX_TIMESTAMP
+        # time_bin = FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(timestamp) / interval) * interval)
+        time_bin_expr = func.from_unixtime(
+            func.floor(func.unix_timestamp(ViewershipHistory.timestamp) / interval_seconds) * interval_seconds
+        )
+        
+        # Subquery to get distinct time bins for counting
+        count_subq = (
+            select(time_bin_expr.label('time_bin'))
+            .where(*base_filter)
+            .group_by(text('time_bin'))
+            .subquery()
+        )
+        
+        count_stmt = select(func.count()).select_from(count_subq)
+        total = await self.session.scalar(count_stmt) or 0
+        
+        # Main query for aggregated data
+        # We get min(id) for the bin to use as the base ID
+        stmt = (
+            select(
+                func.min(ViewershipHistory.id).label('min_id'),
+                ViewershipHistory.livestream_id,
+                time_bin_expr.label('time_bin'),
+                func.round(func.avg(ViewershipHistory.viewcount)).label('avg_viewcount'),
+            )
+            .where(*base_filter)
+            .group_by(ViewershipHistory.livestream_id, text('time_bin'))
+            .order_by(text('time_bin DESC'))
+            .offset(skip)
+            .limit(limit)
+        )
+        
+        result = await self.session.execute(stmt)
+        rows = result.all()
+        
+        # Convert to response objects
+        history = [
+            DownsampledViewershipResponse(
+                id=f"{row.min_id}_{interval_suffix}",
+                livestream_id=row.livestream_id,
+                timestamp=row.time_bin,
+                viewcount=int(row.avg_viewcount or 0),
+            )
+            for row in rows
+        ]
         
         return history, total
     

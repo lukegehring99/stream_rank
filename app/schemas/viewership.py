@@ -6,9 +6,28 @@ Request and response schemas for viewership history endpoints.
 """
 
 from datetime import datetime
-from typing import Optional
+from enum import Enum
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field
+
+
+class DownsampleInterval(str, Enum):
+    """Downsampling interval options for viewership history."""
+    
+    ONE_MINUTE = "1m"
+    FIVE_MINUTES = "5m"
+    TEN_MINUTES = "10m"
+    ONE_HOUR = "1hr"
+
+
+# Mapping from enum to seconds for SQL aggregation
+DOWNSAMPLE_SECONDS = {
+    DownsampleInterval.ONE_MINUTE: 60,       # 1 * 60
+    DownsampleInterval.FIVE_MINUTES: 300,    # 5 * 60
+    DownsampleInterval.TEN_MINUTES: 600,     # 10 * 60
+    DownsampleInterval.ONE_HOUR: 3600,       # 60 * 60
+}
 
 
 class ViewershipHistoryResponse(BaseModel):
@@ -22,12 +41,21 @@ class ViewershipHistoryResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class DownsampledViewershipResponse(BaseModel):
+    """Response schema for a downsampled viewership history entry."""
+    
+    id: str = Field(..., description="Binned identifier (original_id + interval suffix)")
+    livestream_id: int = Field(..., description="Associated livestream ID")
+    timestamp: datetime = Field(..., description="Bin start timestamp (UTC)")
+    viewcount: int = Field(..., description="Average viewer count for the bin")
+
+
 class ViewershipHistoryListResponse(BaseModel):
     """Response schema for viewership history list."""
     
-    items: list[ViewershipHistoryResponse] = Field(
+    items: list[Union[ViewershipHistoryResponse, DownsampledViewershipResponse]] = Field(
         ..., 
-        description="List of viewership history entries"
+        description="List of viewership history entries (raw or downsampled)"
     )
     total: int = Field(..., description="Total number of entries")
     page: int = Field(1, description="Current page number")
@@ -41,4 +69,8 @@ class ViewershipHistoryListResponse(BaseModel):
     end_time: Optional[datetime] = Field(
         None, 
         description="Query end time filter"
+    )
+    downsample: Optional[DownsampleInterval] = Field(
+        None,
+        description="Downsample interval applied to the data"
     )

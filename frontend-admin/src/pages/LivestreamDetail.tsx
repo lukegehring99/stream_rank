@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
@@ -11,6 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceArea,
 } from 'recharts';
 import { DeleteModal, Pagination } from '../components';
 import {
@@ -18,8 +19,26 @@ import {
   useViewershipHistory,
   useUpdateLivestream,
   useDeleteLivestream,
+  useDownsampledViewershipHistory,
 } from '../hooks';
 import { EditLivestreamForm } from '../types';
+
+// Type for chart data points
+interface ChartDataPoint {
+  time: number; // Unix timestamp for proper ordering
+  displayTime: string;
+  viewers: number;
+  isDownsampled: boolean;
+}
+
+// Type for zoom state
+interface ZoomState {
+  left: number | null;
+  right: number | null;
+  refAreaLeft: string | null;
+  refAreaRight: string | null;
+  isZooming: boolean;
+}
 
 export const LivestreamDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -30,13 +49,47 @@ export const LivestreamDetail: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
+  
+  // Zoom state for the chart
+  const [zoomState, setZoomState] = useState<ZoomState>({
+    left: null,
+    right: null,
+    refAreaLeft: null,
+    refAreaRight: null,
+    isZooming: false,
+  });
+  
+  // Time range for refined data fetching
+  const [timeRange, setTimeRange] = useState<{ start?: string; end?: string }>({});
+  const [currentResolution, setCurrentResolution] = useState<'1m' | '5m' | '10m' | '1hr'>('1hr');
 
   // Queries
   const { data: stream, isLoading, isError } = useLivestream(livestreamId);
+  
+  // Raw data for table and detailed view
   const { data: history, isLoading: historyLoading } = useViewershipHistory(
     livestreamId,
     historyPage,
     50
+  );
+  
+  // Downsampled data for overview chart (1hr resolution)
+  const { data: downsampledHistory, isLoading: downsampledLoading } = useDownsampledViewershipHistory(
+    livestreamId,
+    '1hr',
+    1000
+  );
+  
+  // Refined data when zoomed in
+  const { data: refinedHistory, isLoading: refinedLoading } = useViewershipHistory(
+    livestreamId,
+    1,
+    3000,
+    timeRange.start && timeRange.end ? {
+      startTime: timeRange.start,
+      endTime: timeRange.end,
+      downsample: currentResolution,
+    } : undefined
   );
 
   // Mutations
@@ -100,17 +153,150 @@ export const LivestreamDetail: React.FC = () => {
     return new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
   };
 
-  // Chart data
-  const chartData = history?.items
-    ? history.items
-        .slice()
-        .reverse()
-        .map((record) => ({
-          time: format(parseUTC(record.timestamp), 'HH:mm'),
+  // Prepare chart data from downsampled or refined history
+  const chartData = useMemo((): ChartDataPoint[] => {
+    const sourceData = timeRange.start && timeRange.end && refinedHistory?.items 
+      ? refinedHistory.items 
+      : downsampledHistory?.items;
+    
+    if (!sourceData || sourceData.length === 0) return [];
+    
+    return sourceData
+      .slice()
+      .reverse()
+      .map((record) => {
+        const date = parseUTC(record.timestamp);
+        return {
+          time: date.getTime(),
+          displayTime: format(date, 'MMM d, HH:mm'),
           viewers: record.viewcount,
-          isAnomaly: false,
-        }))
-    : undefined;
+          isDownsampled: typeof record.id === 'string',
+        };
+      });
+  }, [downsampledHistory?.items, refinedHistory?.items, timeRange]);
+
+  // Determine resolution based on zoom level
+  // ~2 days -> 1min, 2-5 days -> 5min, 5-10 days -> 10min, >10 days -> 1hr
+  const calculateResolutionForRange = useCallback((startTime: number, endTime: number) => {
+    const rangeDays = (endTime - startTime) / (1000 * 60 * 60 * 24);
+    
+    if (rangeDays <= 2) {
+      return '1m'; // 1 min resolution for <= 2 days
+    } else if (rangeDays <= 5) {
+      return '5m'; // 5 min resolution for 2-5 days
+    } else if (rangeDays <= 10) {
+      return '10m'; // 10 min resolution for 5-10 days
+    }
+    return '1hr'; // 1 hour resolution for > 10 days
+  }, []);
+
+  // Handle zoom selection start
+  const handleMouseDown = (e: { activeLabel?: string }) => {
+    if (e?.activeLabel) {
+      setZoomState(prev => ({
+        ...prev,
+        refAreaLeft: e.activeLabel!,
+        isZooming: true,
+      }));
+    }
+  };
+
+  // Handle zoom selection move
+  const handleMouseMove = (e: { activeLabel?: string }) => {
+    if (zoomState.isZooming && e?.activeLabel) {
+      setZoomState(prev => ({
+        ...prev,
+        refAreaRight: e.activeLabel!,
+      }));
+    }
+  };
+
+  // Handle zoom selection end
+  const handleMouseUp = () => {
+    if (!zoomState.isZooming || !zoomState.refAreaLeft || !zoomState.refAreaRight) {
+      setZoomState(prev => ({ ...prev, isZooming: false, refAreaLeft: null, refAreaRight: null }));
+      return;
+    }
+
+    let left = parseInt(zoomState.refAreaLeft);
+    let right = parseInt(zoomState.refAreaRight);
+
+    if (left > right) [left, right] = [right, left];
+    
+    // Calculate the resolution based on the time range
+    const newResolution = calculateResolutionForRange(left, right);
+    
+    // Update time range for refined query
+    setTimeRange({
+      start: new Date(left).toISOString(),
+      end: new Date(right).toISOString(),
+    });
+    setCurrentResolution(newResolution);
+    
+    setZoomState({
+      left,
+      right,
+      refAreaLeft: null,
+      refAreaRight: null,
+      isZooming: false,
+    });
+  };
+
+  // Reset zoom
+  const handleZoomReset = () => {
+    setZoomState({
+      left: null,
+      right: null,
+      refAreaLeft: null,
+      refAreaRight: null,
+      isZooming: false,
+    });
+    setTimeRange({});
+    setCurrentResolution('1hr');
+  };
+
+  // Get visible chart data based on zoom
+  const visibleChartData = useMemo(() => {
+    if (zoomState.left !== null && zoomState.right !== null) {
+      return chartData.filter(d => d.time >= zoomState.left! && d.time <= zoomState.right!);
+    }
+    return chartData;
+  }, [chartData, zoomState.left, zoomState.right]);
+
+  // Format axis tick based on data density
+  const formatAxisTick = (timestamp: number) => {
+    const date = new Date(timestamp);
+    if (currentResolution === '1m' || currentResolution === '5m') {
+      return format(date, 'HH:mm');
+    }
+    return format(date, 'MMM d, HH:mm');
+  };
+
+  // Custom tooltip
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: number }) => {
+    if (active && payload && payload.length && label) {
+      const date = new Date(label);
+      return (
+        <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
+          <p className="text-sm text-gray-500 mb-1">
+            {format(date, 'EEEE, MMM d, yyyy')}
+          </p>
+          <p className="text-sm font-medium text-gray-900">
+            {format(date, 'HH:mm:ss')}
+          </p>
+          <p className="text-lg font-bold text-blue-600 mt-1">
+            {formatViewers(payload[0].value)} viewers
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Resolution: {currentResolution}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const chartLoading = downsampledLoading || (timeRange.start && refinedLoading);
 
   if (isLoading) {
     return (
@@ -313,48 +499,99 @@ export const LivestreamDetail: React.FC = () => {
 
       {/* Viewership Chart */}
       <div className="card">
-        <div className="card-header">
-          <h3 className="text-lg font-semibold text-gray-900">Viewership History</h3>
+        <div className="card-header flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Viewership History</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Resolution: {currentResolution}
+              {zoomState.left !== null && (
+                <span className="ml-2">
+                  • Viewing: {format(new Date(zoomState.left), 'MMM d, HH:mm')} - {format(new Date(zoomState.right!), 'MMM d, HH:mm')}
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {(zoomState.left !== null || timeRange.start) && (
+              <button
+                onClick={handleZoomReset}
+                className="btn-secondary btn-sm"
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                </svg>
+                Reset Zoom
+              </button>
+            )}
+            <span className="text-xs text-gray-400">
+              Drag to zoom
+            </span>
+          </div>
         </div>
         <div className="card-body">
-          {historyLoading ? (
-            <div className="h-80 flex items-center justify-center">
+          {chartLoading ? (
+            <div className="h-96 flex items-center justify-center">
               <div className="spinner w-8 h-8" />
             </div>
-          ) : chartData && chartData.length > 0 ? (
-            <div className="h-80">
+          ) : visibleChartData && visibleChartData.length > 0 ? (
+            <div className="h-96 select-none">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
+                <LineChart
+                  data={visibleChartData}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={() => {
+                    if (zoomState.isZooming) {
+                      setZoomState(prev => ({ ...prev, isZooming: false, refAreaLeft: null, refAreaRight: null }));
+                    }
+                  }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="time" stroke="#6b7280" fontSize={12} />
+                  <XAxis
+                    dataKey="time"
+                    type="number"
+                    domain={['dataMin', 'dataMax']}
+                    tickFormatter={formatAxisTick}
+                    stroke="#6b7280"
+                    fontSize={11}
+                    tick={{ fill: '#6b7280' }}
+                    tickCount={8}
+                  />
                   <YAxis
                     stroke="#6b7280"
                     fontSize={12}
                     tickFormatter={(value) => formatViewers(value)}
+                    width={60}
                   />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    }}
-                    formatter={(value: number) => [formatViewers(value), 'Viewers']}
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend 
+                    formatter={() => 'Viewers'}
+                    wrapperStyle={{ paddingTop: '10px' }}
                   />
-                  <Legend />
                   <Line
                     type="monotone"
                     dataKey="viewers"
                     stroke="#3b82f6"
                     strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 6 }}
+                    activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                    animationDuration={300}
                   />
+                  {zoomState.isZooming && zoomState.refAreaLeft && zoomState.refAreaRight && (
+                    <ReferenceArea
+                      x1={zoomState.refAreaLeft}
+                      x2={zoomState.refAreaRight}
+                      strokeOpacity={0.3}
+                      fill="#3b82f6"
+                      fillOpacity={0.2}
+                    />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-80 flex items-center justify-center text-gray-500">
+            <div className="h-96 flex items-center justify-center text-gray-500">
               <div className="text-center">
                 <svg className="w-12 h-12 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
