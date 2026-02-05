@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { Layout, ToastProvider } from './components';
-import { Login, Dashboard, Livestreams, LivestreamDetail, AddLivestream } from './pages';
+import { Login, Dashboard, Livestreams, LivestreamDetail, AddLivestream, AnomalyView } from './pages';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -32,6 +32,7 @@ const App: React.FC = () => {
               <Route path="/livestreams" element={<Livestreams />} />
               <Route path="/livestreams/add" element={<AddLivestream />} />
               <Route path="/livestreams/:id" element={<LivestreamDetail />} />
+              <Route path="/anomaly" element={<AnomalyView />} />
             </Route>
 
             {/* Catch all */}

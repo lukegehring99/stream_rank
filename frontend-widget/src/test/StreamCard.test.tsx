@@ -5,20 +5,14 @@ import { Livestream } from '../types';
 
 const mockStream: Livestream = {
   id: 'test-stream-1',
-  video_id: 'dQw4w9WgXcQ',
-  title: 'Test Stream Title',
-  channel_name: 'Test Channel',
-  channel_id: 'UC123456',
-  description: 'This is a test stream description',
-  thumbnail_url: 'https://example.com/thumb.jpg',
-  stream_url: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
+  youtube_video_id: 'dQw4w9WgXcQ',
+  name: 'Test Stream Title',
+  channel: 'Test Channel',
+  url: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
+  is_live: true,
   current_viewers: 15000,
   trend_score: 85,
   rank: 1,
-  started_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  last_updated: new Date().toISOString(),
-  tags: ['gaming', 'live'],
-  category: 'Gaming',
 };
 
 describe('StreamCard', () => {
@@ -94,11 +88,7 @@ describe('StreamCard', () => {
     const toggleButton = screen.getByText('Show details');
     fireEvent.click(toggleButton);
 
-    expect(screen.getByText('This is a test stream description')).toBeInTheDocument();
-    // Category is rendered with a bullet, so we use a partial text match
-    expect(screen.getByText(/Gaming/)).toBeInTheDocument();
-    expect(screen.getByText('gaming')).toBeInTheDocument();
-    expect(screen.getByText('live')).toBeInTheDocument();
+    expect(screen.getByText('Watch on YouTube')).toBeInTheDocument();
   });
 
   it('applies selected styles when isSelected is true', () => {

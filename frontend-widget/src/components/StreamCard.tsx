@@ -4,7 +4,6 @@ import {
   Livestream,
   getTrendStatus,
   formatViewerCount,
-  formatTimeAgo,
   TrendStatus,
 } from '../types';
 
@@ -75,7 +74,7 @@ export const StreamCard: React.FC<StreamCardProps> = ({
   onSelect,
 }) => {
   const [showDetails, setShowDetails] = useState(false);
-  const trendStatus = getTrendStatus(stream.trend_score);
+  const trendStatus = stream.trend_score !== null ? getTrendStatus(stream.trend_score) : null;
 
   return (
     <div
@@ -102,28 +101,17 @@ export const StreamCard: React.FC<StreamCardProps> = ({
           {/* Content */}
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate mb-1">
-              {stream.title}
+              {stream.name}
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 truncate mb-2">
-              {stream.channel_name}
+              {stream.channel}
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <TrendBadge status={trendStatus} score={stream.trend_score} />
+              {trendStatus !== null && stream.trend_score !== null && (
+                <TrendBadge status={trendStatus} score={stream.trend_score} />
+              )}
               <ViewersBadge count={stream.current_viewers} />
-              <span className="text-xs text-slate-400 dark:text-slate-500">
-                Started {formatTimeAgo(stream.started_at)}
-              </span>
             </div>
-          </div>
-
-          {/* Thumbnail */}
-          <div className="hidden sm:block flex-shrink-0 w-24 h-16 rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700">
-            <img
-              src={stream.thumbnail_url}
-              alt=""
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
           </div>
         </div>
 
@@ -157,14 +145,9 @@ export const StreamCard: React.FC<StreamCardProps> = ({
 
           {showDetails && (
             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 animate-fade-in">
-              {stream.description && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2 line-clamp-2">
-                  {stream.description}
-                </p>
-              )}
               <div className="flex flex-wrap gap-2 text-xs">
                 <a
-                  href={stream.stream_url}
+                  href={stream.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
@@ -185,24 +168,7 @@ export const StreamCard: React.FC<StreamCardProps> = ({
                   </svg>
                   Watch on YouTube
                 </a>
-                {stream.category && (
-                  <span className="text-slate-500 dark:text-slate-400">
-                    • {stream.category}
-                  </span>
-                )}
               </div>
-              {stream.tags && stream.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {stream.tags.slice(0, 5).map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded text-xs"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
           )}
         </div>

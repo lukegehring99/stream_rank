@@ -85,39 +85,31 @@ Host the built files and include directly in your page:
 
 The widget expects the following API endpoints:
 
-### GET /streams/trending
+### GET /livestreams
 
-Returns a list of trending streams.
+Returns a list of trending livestreams.
 
 **Query Parameters:**
-- `limit` (number): Number of streams to return
+- `count` (number): Number of streams to return (1-100)
 
 **Response:**
 ```json
 {
-  "streams": [
+  "items": [
     {
       "id": "string",
-      "video_id": "string",
-      "title": "string",
-      "channel_name": "string",
-      "channel_id": "string",
-      "description": "string",
-      "thumbnail_url": "string",
-      "stream_url": "string",
+      "youtube_video_id": "string",
+      "name": "string",
+      "channel": "string",
+      "url": "string",
+      "is_live": true,
       "current_viewers": 12345,
-      "trend_score": 85,
       "rank": 1,
-      "started_at": "2024-01-01T00:00:00Z",
-      "last_updated": "2024-01-01T00:00:00Z",
-      "tags": ["gaming", "live"],
-      "category": "Gaming"
+      "trend_score": 85
     }
   ],
-  "total": 100,
-  "page": 1,
-  "page_size": 10,
-  "fetched_at": "2024-01-01T00:00:00Z"
+  "count": 10,
+  "cached_at": "2024-01-01T00:00:00Z"
 }
 ```
 

@@ -1,20 +1,14 @@
 // Stream data types matching the API response
 export interface Livestream {
   id: string;
-  video_id: string;
-  title: string;
-  channel_name: string;
-  channel_id: string;
-  description: string;
-  thumbnail_url: string;
-  stream_url: string;
+  youtube_video_id: string;
+  name: string;
+  channel: string;
+  url: string;
+  is_live: boolean;
   current_viewers: number;
-  trend_score: number;
   rank: number;
-  started_at: string;
-  last_updated: string;
-  tags?: string[];
-  category?: string;
+  trend_score: number | null;
 }
 
 export interface ViewershipDataPoint {
@@ -28,11 +22,9 @@ export interface ViewershipHistory {
 }
 
 export interface StreamsResponse {
-  streams: Livestream[];
-  total: number;
-  page: number;
-  page_size: number;
-  fetched_at: string;
+  items: Livestream[];
+  count: number;
+  cached_at: string | null;
 }
 
 export interface ViewershipResponse {

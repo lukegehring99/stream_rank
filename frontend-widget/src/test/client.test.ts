@@ -19,13 +19,11 @@ describe('API Client', () => {
   describe('fetchTrendingStreams', () => {
     it('fetches streams successfully', async () => {
       const mockResponse = {
-        streams: [
-          { id: '1', title: 'Test Stream', video_id: 'abc123' },
+        items: [
+          { id: '1', name: 'Test Stream', youtube_video_id: 'abc123' },
         ],
-        total: 1,
-        page: 1,
-        page_size: 10,
-        fetched_at: new Date().toISOString(),
+        count: 1,
+        cached_at: new Date().toISOString(),
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -34,9 +32,9 @@ describe('API Client', () => {
       });
 
       const result = await fetchTrendingStreams('http://localhost:8000/api/v1', 10);
-      expect(result).toEqual(mockResponse.streams);
+      expect(result).toEqual(mockResponse.items);
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8000/api/v1/streams/trending?limit=10',
+        'http://localhost:8000/api/v1/livestreams?count=10',
         expect.any(Object)
       );
     });

@@ -22,7 +22,7 @@ const App: React.FC = () => {
     error: viewershipError,
   } = useViewership(
     config.apiBaseUrl,
-    selectedStream?.video_id ?? null
+    selectedStream?.youtube_video_id ?? null
   );
 
   const handleSelectStream = (stream: Livestream) => {
@@ -117,8 +117,8 @@ const App: React.FC = () => {
             <div className="lg:col-span-3 space-y-4 animate-slide-in">
               {/* YouTube Player */}
               <YouTubePlayer
-                videoId={selectedStream.video_id}
-                title={selectedStream.title}
+                videoId={selectedStream.youtube_video_id}
+                title={selectedStream.name}
                 onClose={handleClosePlayer}
               />
 

@@ -124,6 +124,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+        VITE_WIDGET_URL: ${VITE_WIDGET_URL:-http://localhost:3000}
+        VITE_WIDGET_GITHUB_URL: ${VITE_WIDGET_GITHUB_URL:-}
     container_name: streamrank_admin
     restart: unless-stopped
     ports:

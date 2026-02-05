@@ -43,7 +43,7 @@ export async function fetchTrendingStreams(
   baseUrl: string,
   count: number
 ): Promise<Livestream[]> {
-  const url = `${baseUrl}/streams/trending?limit=${count}`;
+  const url = `${baseUrl}/livestreams?count=${count}`;
 
   try {
     const response = await fetchWithTimeout(url);
@@ -53,7 +53,7 @@ export async function fetchTrendingStreams(
     }
 
     const data: StreamsResponse = await response.json();
-    return data.streams;
+    return data.items;
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(500, 'Network error: Unable to fetch streams');
@@ -110,27 +110,17 @@ export function generateMockStreams(count: number): Livestream[] {
 
   return Array.from({ length: count }, (_, i) => {
     const channel = channels[i % channels.length];
-    const startedHoursAgo = Math.floor(Math.random() * 12) + 1;
-    const startedAt = new Date(
-      Date.now() - startedHoursAgo * 60 * 60 * 1000
-    ).toISOString();
 
     return {
       id: `stream-${i + 1}`,
-      video_id: `dQw4w9WgXc${String(i).padStart(1, '0')}`,
-      title: titles[i % titles.length],
-      channel_name: channel.name,
-      channel_id: channel.id,
-      description: `This is an amazing livestream from ${channel.name}. Join us for exciting content!`,
-      thumbnail_url: `https://picsum.photos/seed/${i + 1}/320/180`,
-      stream_url: `https://youtube.com/watch?v=dQw4w9WgXc${i}`,
+      youtube_video_id: `dQw4w9WgXc${String(i).padStart(1, '0')}`,
+      name: titles[i % titles.length],
+      channel: channel.name,
+      url: `https://youtube.com/watch?v=dQw4w9WgXc${i}`,
+      is_live: true,
       current_viewers: Math.floor(Math.random() * 50000) + 1000,
       trend_score: Math.floor(Math.random() * 100),
       rank: i + 1,
-      started_at: startedAt,
-      last_updated: new Date().toISOString(),
-      tags: ['live', 'trending'],
-      category: 'Entertainment',
     };
   });
 }
