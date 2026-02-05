@@ -1,0 +1,341 @@
+"""
+Admin API Routes
+================
+
+JWT-protected endpoints for administrative operations.
+"""
+
+from datetime import datetime, timezone
+from typing import Annotated, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth.dependencies import CurrentUser
+from app.db import get_async_session
+from app.schemas import (
+    LivestreamCreate,
+    LivestreamUpdate,
+    LivestreamResponse,
+    LivestreamListResponse,
+    ViewershipHistoryListResponse,
+    DashboardStats,
+)
+from app.services import LivestreamService
+
+
+router = APIRouter(
+    prefix="/admin",
+    tags=["Admin"],
+    responses={
+        401: {"description": "Not authenticated"},
+        403: {"description": "Not authorized"},
+    },
+)
+
+
+# ============================================================================
+# Dashboard Stats Endpoint
+# ============================================================================
+
+@router.get(
+    "/stats",
+    response_model=DashboardStats,
+    summary="Get Dashboard Statistics",
+    description="Get aggregated statistics for the admin dashboard.",
+)
+async def get_dashboard_stats(
+    current_user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> DashboardStats:
+    """
+    Get dashboard statistics.
+    
+    Requires admin authentication.
+    
+    Returns:
+        Dashboard statistics including stream counts and viewer totals
+    """
+    service = LivestreamService(session)
+    stats = await service.get_dashboard_stats()
+    return DashboardStats(**stats)
+
+
+# ============================================================================
+# Livestream CRUD Endpoints
+# ============================================================================
+
+@router.get(
+    "/livestreams",
+    response_model=LivestreamListResponse,
+    summary="List All Livestreams",
+    description="Get a paginated list of all livestreams (admin only).",
+)
+async def list_livestreams(
+    current_user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
+    search: Annotated[Optional[str], Query(description="Search term for name or channel")] = None,
+    is_live: Annotated[Optional[bool], Query(description="Filter by live status")] = None,
+) -> LivestreamListResponse:
+    """
+    List all livestreams with pagination.
+    
+    Requires admin authentication.
+    
+    Args:
+        page: Page number (1-based)
+        page_size: Maximum items per page (1-100)
+        search: Optional search term
+        is_live: Optional filter by live status
+    
+    Returns:
+        Paginated list of livestreams with total count
+    """
+    service = LivestreamService(session)
+    skip = (page - 1) * page_size
+    livestreams, total = await service.get_all(
+        skip=skip, 
+        limit=page_size, 
+        search=search,
+        is_live=is_live
+    )
+    total_pages = (total + page_size - 1) // page_size
+    
+    return LivestreamListResponse(
+        items=[LivestreamResponse.model_validate(ls) for ls in livestreams],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
+
+
+@router.post(
+    "/livestreams",
+    response_model=LivestreamResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Livestream",
+    description="Create a new livestream by YouTube video ID or URL.",
+)
+async def create_livestream(
+    current_user: CurrentUser,
+    data: LivestreamCreate,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> LivestreamResponse:
+    """
+    Create a new livestream.
+    
+    Accepts either a YouTube video ID or full URL. The video ID will be
+    extracted from the URL if provided.
+    
+    Requires admin authentication.
+    
+    Args:
+        data: Livestream creation data
+    
+    Returns:
+        Created livestream details
+    
+    Raises:
+        HTTPException: 400 if video ID already exists
+    """
+    service = LivestreamService(session)
+    
+    try:
+        livestream = await service.create(data)
+        return LivestreamResponse.model_validate(livestream)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+
+@router.get(
+    "/livestreams/{livestream_id}",
+    response_model=LivestreamResponse,
+    summary="Get Livestream",
+    description="Get details of a specific livestream.",
+)
+async def get_livestream(
+    livestream_id: str,
+    current_user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> LivestreamResponse:
+    """
+    Get a single livestream by ID.
+    
+    Requires admin authentication.
+    
+    Args:
+        livestream_id: Livestream public ID (UUID)
+    
+    Returns:
+        Livestream details
+    
+    Raises:
+        HTTPException: 404 if not found
+    """
+    service = LivestreamService(session)
+    livestream = await service.get_by_public_id(livestream_id)
+    
+    if not livestream:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Livestream with ID {livestream_id} not found",
+        )
+    
+    return LivestreamResponse.model_validate(livestream)
+
+
+@router.put(
+    "/livestreams/{livestream_id}",
+    response_model=LivestreamResponse,
+    summary="Update Livestream",
+    description="Update metadata for an existing livestream.",
+)
+async def update_livestream(
+    livestream_id: str,
+    data: LivestreamUpdate,
+    current_user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> LivestreamResponse:
+    """
+    Update a livestream's metadata.
+    
+    Only fields provided in the request body will be updated.
+    Requires admin authentication.
+    
+    Args:
+        livestream_id: Livestream public ID (UUID)
+        data: Fields to update
+    
+    Returns:
+        Updated livestream details
+    
+    Raises:
+        HTTPException: 404 if not found
+    """
+    service = LivestreamService(session)
+    livestream = await service.update_by_public_id(livestream_id, data)
+    
+    if not livestream:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Livestream with ID {livestream_id} not found",
+        )
+    
+    return LivestreamResponse.model_validate(livestream)
+
+
+@router.delete(
+    "/livestreams/{livestream_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete Livestream",
+    description="Delete a livestream and all associated data.",
+)
+async def delete_livestream(
+    livestream_id: str,
+    current_user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> None:
+    """
+    Delete a livestream.
+    
+    This will also delete all associated viewership history.
+    Requires admin authentication.
+    
+    Args:
+        livestream_id: Livestream public ID (UUID)
+    
+    Raises:
+        HTTPException: 404 if not found
+    """
+    service = LivestreamService(session)
+    deleted = await service.delete_by_public_id(livestream_id)
+    
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Livestream with ID {livestream_id} not found",
+        )
+
+
+# ============================================================================
+# Viewership History Endpoints
+# ============================================================================
+
+@router.get(
+    "/livestreams/{livestream_id}/history",
+    response_model=ViewershipHistoryListResponse,
+    summary="Get Viewership History",
+    description="Get viewership history for a specific livestream.",
+)
+async def get_viewership_history(
+    livestream_id: str,
+    current_user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    start_time: Annotated[
+        Optional[datetime],
+        Query(description="Start of time range (ISO 8601 format)"),
+    ] = None,
+    end_time: Annotated[
+        Optional[datetime],
+        Query(description="End of time range (ISO 8601 format)"),
+    ] = None,
+    limit: Annotated[
+        int,
+        Query(ge=1, le=10000, description="Maximum records to return"),
+    ] = 1000,
+) -> ViewershipHistoryListResponse:
+    """
+    Get viewership history for a livestream.
+    
+    Returns time-series data of viewer counts within the specified
+    time range. Defaults to last 24 hours if no range specified.
+    
+    Requires admin authentication.
+    
+    Args:
+        livestream_id: Livestream public ID (UUID)
+        start_time: Start of time range (default: 24 hours ago)
+        end_time: End of time range (default: now)
+        limit: Maximum records to return
+    
+    Returns:
+        List of viewership history records
+    
+    Raises:
+        HTTPException: 404 if livestream not found
+    """
+    service = LivestreamService(session)
+    
+    # Verify livestream exists
+    livestream = await service.get_by_public_id(livestream_id)
+    if not livestream:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Livestream with ID {livestream_id} not found",
+        )
+    
+    history, total = await service.get_viewership_history(
+        livestream_id=livestream.id,  # Use internal ID for DB query
+        start_time=start_time,
+        end_time=end_time,
+        limit=limit,
+    )
+    
+    # Determine actual time range used
+    actual_end = end_time or datetime.now(timezone.utc)
+    from datetime import timedelta
+    actual_start = start_time or (actual_end - timedelta(hours=24))
+    
+    return ViewershipHistoryListResponse(
+        items=history,
+        total=total,
+        livestream_id=livestream_id,  # Return public ID
+        start_time=actual_start,
+        end_time=actual_end,
+    )

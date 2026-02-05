@@ -1,0 +1,160 @@
+# ===========================================
+# Docker Ignore File
+# ===========================================
+# Files and directories to exclude from Docker build context
+# This improves build speed and reduces image size
+# ===========================================
+
+# -------------------------------------------
+# Version Control
+# -------------------------------------------
+.git
+.gitignore
+.gitattributes
+
+# -------------------------------------------
+# Documentation
+# -------------------------------------------
+*.md
+!README.md
+docs/
+LICENSE
+
+# -------------------------------------------
+# IDE and Editor
+# -------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-*
+
+# -------------------------------------------
+# Python
+# -------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+.env.local
+.env.*.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# -------------------------------------------
+# Node.js / Frontend
+# -------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# Build outputs (we want to build inside Docker)
+frontend-admin/dist/
+frontend-admin/build/
+frontend-widget/dist/
+frontend-widget/build/
+
+# -------------------------------------------
+# Docker
+# -------------------------------------------
+Dockerfile*
+docker-compose*.yml
+.docker/
+*.dockerfile
+
+# -------------------------------------------
+# Environment and Secrets
+# -------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# -------------------------------------------
+# Logs and Databases
+# -------------------------------------------
+*.log
+logs/
+*.sqlite
+*.sqlite3
+*.db
+
+# -------------------------------------------
+# OS Generated
+# -------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# -------------------------------------------
+# Testing and CI
+# -------------------------------------------
+tests/
+test/
+*.test.js
+*.spec.js
+*.test.ts
+*.spec.ts
+.github/
+.gitlab-ci.yml
+.travis.yml
+Makefile
+Jenkinsfile
+
+# -------------------------------------------
+# Misc
+# -------------------------------------------
+*.bak
+*.tmp
+*.temp
+tmp/
+temp/

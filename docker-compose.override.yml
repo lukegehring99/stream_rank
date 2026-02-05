@@ -1,0 +1,110 @@
+# Docker Compose Override for Development
+# This file is automatically merged with docker-compose.yml
+# Enables hot reload and debug mode
+
+version: "3.8"
+
+services:
+  # ===================
+  # MySQL Database (Dev)
+  # ===================
+  mysql:
+    # Expose MySQL for local tools (DBeaver, DataGrip, etc.)
+    ports:
+      - "3306:3306"
+
+  # ===================
+  # FastAPI Backend (Dev)
+  # ===================
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: base  # Use base stage for development
+    environment:
+      # Enable debug mode
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      
+      # Disable CORS restrictions for development
+      CORS_ORIGINS: "*"
+    volumes:
+      # Mount source code for hot reload
+      - ./app:/app/app:ro
+      - ./db:/app/db:ro
+    # Use uvicorn with reload for development
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/app", "--log-level", "debug"]
+
+  # ===================
+  # Background Worker (Dev)
+  # ===================
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: base  # Use base stage for development
+    environment:
+      # Database connection (required - same as main compose file)
+      DATABASE_URL: ${DATABASE_URL:-mysql+asyncmy://streamrank:streamrank_password@mysql:3306/streamrank}
+      
+      # YouTube API Configuration  
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-your-youtube-api-key}
+      
+      # Enable debug mode
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      
+      # Shorter poll interval for testing
+      POLL_INTERVAL_MINUTES: 1
+      
+      # Retention
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
+    volumes:
+      # Mount source code for hot reload
+      - ./app:/app/app:ro
+      - ./worker:/app/worker:ro
+      - ./db:/app/db:ro
+    command: ["python", "-m", "worker.main"]
+
+  # ===================
+  # Admin Frontend (Dev)
+  # ===================
+  admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+    # For development, you might want to use the Vite dev server instead
+    # Uncomment below and comment out the build section to use dev server
+    # image: node:20-alpine
+    # working_dir: /app
+    # volumes:
+    #   - ./frontend-admin:/app
+    #   - /app/node_modules
+    # command: npm run dev -- --host 0.0.0.0 --port 3001
+    # ports:
+    #   - "3001:3001"
+    environment:
+      NODE_ENV: development
+
+  # ===================
+  # Redis (Dev/Optional)
+  # For caching if needed
+  # ===================
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: streamrank_redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - streamrank_net
+  #   volumes:
+  #     - redis_data:/data
+  #   command: redis-server --appendonly yes
+
+# ===================
+# Development Volumes
+# ===================
+# volumes:
+#   redis_data:
+#     driver: local

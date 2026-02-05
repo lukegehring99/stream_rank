@@ -1,0 +1,152 @@
+# Docker Compose configuration for Trending YouTube Livestreams
+# Production-ready setup with all services
+
+version: "3.8"
+
+services:
+  # ===================
+  # MySQL Database
+  # ===================
+  mysql:
+    image: mysql:8.0
+    container_name: streamrank_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-streamrank}
+      MYSQL_USER: ${MYSQL_USER:-streamrank}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-streamrank_password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed_data.sql:/docker-entrypoint-initdb.d/02-seed_data.sql:ro
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/00-init-db.sh:ro
+    networks:
+      - streamrank_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --max_connections=200
+      --innodb_buffer_pool_size=256M
+
+  # ===================
+  # FastAPI Backend
+  # ===================
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: production
+    container_name: streamrank_api
+    restart: unless-stopped
+    environment:
+      # Database connection
+      DATABASE_URL: ${DATABASE_URL:-mysql+asyncmy://streamrank:streamrank_password@mysql:3306/streamrank}
+      
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-24}
+      
+      # API Configuration
+      CACHE_TTL_MINUTES: ${CACHE_TTL_MINUTES:-5}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      
+      # YouTube API (for video validation)
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    networks:
+      - streamrank_net
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ===================
+  # Background Worker
+  # ===================
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: production
+    container_name: streamrank_worker
+    restart: unless-stopped
+    environment:
+      # Database connection
+      DATABASE_URL: ${DATABASE_URL:-mysql+asyncmy://streamrank:streamrank_password@mysql:3306/streamrank}
+      
+      # YouTube API Configuration
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-your-youtube-api-key}
+      
+      # Worker Configuration
+      POLL_INTERVAL_MINUTES: ${POLL_INTERVAL_MINUTES:-3}
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    networks:
+      - streamrank_net
+    depends_on:
+      mysql:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    # Override default command to run worker
+    command: ["python", "-m", "worker.main"]
+
+  # ===================
+  # Admin Frontend
+  # ===================
+  admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+    container_name: streamrank_admin
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-3001}:80"
+    networks:
+      - streamrank_net
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+# ===================
+# Networks
+# ===================
+networks:
+  streamrank_net:
+    driver: bridge
+    name: streamrank_net
+
+# ===================
+# Volumes
+# ===================
+volumes:
+  mysql_data:
+    driver: local
+    name: streamrank_mysql_data
