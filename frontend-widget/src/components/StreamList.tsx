@@ -11,6 +11,7 @@ interface StreamListProps {
   onSelectStream: (stream: Livestream) => void;
   onRefresh: () => void;
   lastUpdated: Date | null;
+  renderDetailPanel?: () => React.ReactNode;
 }
 
 export const StreamList: React.FC<StreamListProps> = ({
@@ -21,6 +22,7 @@ export const StreamList: React.FC<StreamListProps> = ({
   onSelectStream,
   onRefresh,
   lastUpdated,
+  renderDetailPanel,
 }) => {
   if (loading && streams.length === 0) {
     return <StreamListSkeleton count={5} />;
@@ -29,9 +31,9 @@ export const StreamList: React.FC<StreamListProps> = ({
   if (error && streams.length === 0) {
     return (
       <div className="card p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+        <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-red-50 dark:bg-red-950 flex items-center justify-center">
           <svg
-            className="w-8 h-8 text-red-500"
+            className="w-7 h-7 text-red-500"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -44,10 +46,10 @@ export const StreamList: React.FC<StreamListProps> = ({
             />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
+        <h3 className="text-base font-semibold text-neutral-800 dark:text-neutral-200 mb-2">
           Unable to Load Streams
         </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{error}</p>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">{error}</p>
         <button onClick={onRefresh} className="btn btn-primary">
           <svg
             className="w-4 h-4 mr-2"
@@ -71,9 +73,9 @@ export const StreamList: React.FC<StreamListProps> = ({
   if (streams.length === 0) {
     return (
       <div className="card p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+        <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
           <svg
-            className="w-8 h-8 text-slate-400"
+            className="w-7 h-7 text-neutral-400"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -86,10 +88,10 @@ export const StreamList: React.FC<StreamListProps> = ({
             />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
+        <h3 className="text-base font-semibold text-neutral-800 dark:text-neutral-200 mb-2">
           No Streams Found
         </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
           There are no trending streams at the moment. Check back later!
         </p>
       </div>
@@ -97,40 +99,47 @@ export const StreamList: React.FC<StreamListProps> = ({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Header with last updated */}
-      <div className="flex items-center justify-between px-1 mb-4">
+      <div className="flex items-center justify-between px-1 mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+          <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
             {streams.length} streams
           </span>
           {loading && (
-            <span className="flex items-center gap-1 text-xs text-primary-500">
-              <span className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse" />
-              Updating...
+            <span className="flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400">
+              <span className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse-soft" />
+              Updating
             </span>
           )}
         </div>
         {lastUpdated && (
-          <span className="text-xs text-slate-400 dark:text-slate-500">
-            Updated {lastUpdated.toLocaleTimeString()}
+          <span className="text-xs text-neutral-400 dark:text-neutral-500">
+            {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
         )}
       </div>
 
-      {/* Stream Cards */}
+      {/* Stream Cards with inline detail panel on mobile */}
       {streams.map((stream, index) => (
-        <div
-          key={stream.id}
-          className="animate-in"
-          style={{ animationDelay: `${index * 50}ms` }}
-        >
-          <StreamCard
-            stream={stream}
-            isSelected={selectedStream?.id === stream.id}
-            onSelect={onSelectStream}
-          />
-        </div>
+        <React.Fragment key={stream.id}>
+          <div
+            className="animate-in"
+            style={{ animationDelay: `${index * 40}ms` }}
+          >
+            <StreamCard
+              stream={stream}
+              isSelected={selectedStream?.id === stream.id}
+              onSelect={onSelectStream}
+            />
+          </div>
+          {/* Show detail panel below selected stream on mobile */}
+          {selectedStream?.id === stream.id && renderDetailPanel && (
+            <div className="lg:hidden mt-2 animate-in">
+              {renderDetailPanel()}
+            </div>
+          )}
+        </React.Fragment>
       ))}
     </div>
   );

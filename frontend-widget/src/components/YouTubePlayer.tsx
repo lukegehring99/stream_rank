@@ -12,19 +12,19 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   onClose,
 }) => {
   return (
-    <div className="card overflow-hidden animate-scale-in">
+    <div className="card overflow-hidden animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-        <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate pr-4">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-neutral-100 dark:border-neutral-800">
+        <h3 className="font-semibold text-sm text-neutral-900 dark:text-neutral-100 truncate pr-4">
           {title}
         </h3>
         <button
           onClick={onClose}
-          className="btn-ghost p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
           aria-label="Close player"
         >
           <svg
-            className="w-5 h-5 text-slate-500 dark:text-slate-400"
+            className="w-5 h-5"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -52,13 +52,13 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       </div>
 
       {/* Actions */}
-      <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
+      <div className="px-4 py-2.5 bg-gradient-to-r from-neutral-50 to-purple-50/50 dark:from-neutral-900 dark:to-purple-950/30 border-t border-neutral-100 dark:border-neutral-800">
         <div className="flex items-center gap-2">
           <a
             href={`https://youtube.com/watch?v=${videoId}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn btn-ghost text-xs py-1.5 px-3"
+            className="btn btn-primary text-xs py-1.5 px-3"
           >
             <svg
               className="w-4 h-4 mr-1.5"
@@ -67,7 +67,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
             >
               <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
             </svg>
-            Open on YouTube
+            Watch on YouTube
           </a>
           <button
             onClick={() => {

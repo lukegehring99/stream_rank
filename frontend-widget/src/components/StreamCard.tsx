@@ -1,11 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import clsx from 'clsx';
-import {
-  Livestream,
-  getTrendStatus,
-  formatViewerCount,
-  TrendStatus,
-} from '../types';
+import { Livestream, formatViewerCount } from '../types';
 
 interface StreamCardProps {
   stream: Livestream;
@@ -13,50 +8,18 @@ interface StreamCardProps {
   onSelect: (stream: Livestream) => void;
 }
 
-const TrendBadge: React.FC<{ status: TrendStatus; score: number }> = ({
-  status,
-  score,
-}) => {
-  const config = {
-    hot: {
-      icon: '🔥',
-      label: 'Hot',
-      class: 'badge-hot',
-    },
-    rising: {
-      icon: '📈',
-      label: 'Rising',
-      class: 'badge-rising',
-    },
-    stable: {
-      icon: '➡️',
-      label: 'Stable',
-      class: 'badge-stable',
-    },
-    cooling: {
-      icon: '📉',
-      label: 'Cooling',
-      class: 'badge-cooling',
-    },
-  };
+const TrendScore: React.FC<{ score: number }> = ({ score }) => (
+  <span className="trend-score">
+    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+    </svg>
+    {score}
+  </span>
+);
 
-  const { icon, label, class: badgeClass } = config[status];
-
-  return (
-    <span className={clsx('badge', badgeClass)}>
-      <span className="mr-1">{icon}</span>
-      {label} • {score}
-    </span>
-  );
-};
-
-const ViewersBadge: React.FC<{ count: number }> = ({ count }) => (
-  <span className="badge bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-    <svg
-      className="w-3 h-3 mr-1"
-      fill="currentColor"
-      viewBox="0 0 20 20"
-    >
+const ViewerCount: React.FC<{ count: number }> = ({ count }) => (
+  <span className="viewer-count">
+    <svg className="w-4 h-4 text-primary-500" fill="currentColor" viewBox="0 0 20 20">
       <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
       <path
         fillRule="evenodd"
@@ -68,110 +31,61 @@ const ViewersBadge: React.FC<{ count: number }> = ({ count }) => (
   </span>
 );
 
+const RankBadge: React.FC<{ rank: number }> = ({ rank }) => {
+  const isTop3 = rank <= 3;
+  return (
+    <div className={clsx('rank-badge', isTop3 ? 'rank-badge-top' : 'rank-badge-normal')}>
+      {rank}
+    </div>
+  );
+};
+
+const Thumbnail: React.FC<{ videoId: string; title: string }> = ({ videoId, title }) => (
+  <div className="flex-shrink-0 w-24 h-14 rounded-xl overflow-hidden bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700 shadow-sm">
+    <img
+      src={`https://img.youtube.com/vi/${videoId}/mqdefault.jpg`}
+      alt={title}
+      className="w-full h-full object-cover"
+      loading="lazy"
+    />
+  </div>
+);
+
 export const StreamCard: React.FC<StreamCardProps> = ({
   stream,
   isSelected,
   onSelect,
 }) => {
-  const [showDetails, setShowDetails] = useState(false);
-  const trendStatus = stream.trend_score !== null ? getTrendStatus(stream.trend_score) : null;
-
   return (
     <div
       className={clsx(
-        'card card-hover cursor-pointer transition-all duration-200',
-        isSelected && 'ring-2 ring-primary-500 dark:ring-primary-400 shadow-glow-sm'
+        'card card-interactive p-3',
+        isSelected && 'card-selected'
       )}
       onClick={() => onSelect(stream)}
     >
-      <div className="p-4">
-        <div className="flex gap-4">
-          {/* Rank Badge */}
-          <div
-            className={clsx(
-              'flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg',
-              stream.rank <= 3
-                ? 'bg-gradient-to-br from-primary-500 to-accent-500 text-white shadow-glow-sm'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+      <div className="flex items-center gap-3">
+        {/* Rank */}
+        <RankBadge rank={stream.rank} />
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-sm text-neutral-900 dark:text-neutral-100 truncate">
+            {stream.name}
+          </h3>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
+            {stream.channel}
+          </p>
+          <div className="flex items-center gap-2.5 mt-1.5">
+            {stream.trend_score !== null && (
+              <TrendScore score={stream.trend_score} />
             )}
-          >
-            #{stream.rank}
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate mb-1">
-              {stream.name}
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 truncate mb-2">
-              {stream.channel}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {trendStatus !== null && stream.trend_score !== null && (
-                <TrendBadge status={trendStatus} score={stream.trend_score} />
-              )}
-              <ViewersBadge count={stream.current_viewers} />
-            </div>
+            <ViewerCount count={stream.current_viewers} />
           </div>
         </div>
 
-        {/* Expandable Details */}
-        <div className="mt-3">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDetails(!showDetails);
-            }}
-            className="text-xs text-primary-500 dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 font-medium flex items-center gap-1"
-          >
-            <svg
-              className={clsx(
-                'w-4 h-4 transition-transform duration-200',
-                showDetails && 'rotate-180'
-              )}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-            {showDetails ? 'Hide details' : 'Show details'}
-          </button>
-
-          {showDetails && (
-            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 animate-fade-in">
-              <div className="flex flex-wrap gap-2 text-xs">
-                <a
-                  href={stream.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center text-primary-500 hover:text-primary-600 dark:text-primary-400"
-                >
-                  <svg
-                    className="w-3.5 h-3.5 mr-1"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
-                  Watch on YouTube
-                </a>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Thumbnail on the right */}
+        <Thumbnail videoId={stream.youtube_video_id} title={stream.name} />
       </div>
     </div>
   );

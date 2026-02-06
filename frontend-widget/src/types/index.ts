@@ -48,7 +48,7 @@ export const DEFAULT_CONFIG: WidgetConfig = {
   theme: 'light',
 };
 
-// Trend status helper
+// Trend status helper (used for categorizing trend scores)
 export type TrendStatus = 'hot' | 'rising' | 'stable' | 'cooling';
 
 export function getTrendStatus(score: number): TrendStatus {

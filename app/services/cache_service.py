@@ -269,3 +269,8 @@ class CacheKeys:
     def viewership_history(livestream_id: int) -> str:
         """Get cache key for livestream viewership history."""
         return f"viewership:{livestream_id}"
+    
+    @staticmethod
+    def public_viewership(youtube_video_id: str, hours: int) -> str:
+        """Get cache key for public viewership history endpoint."""
+        return f"public_viewership:{youtube_video_id}:{hours}"

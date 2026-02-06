@@ -74,3 +74,21 @@ class ViewershipHistoryListResponse(BaseModel):
         None,
         description="Downsample interval applied to the data"
     )
+
+
+class PublicViewershipDataPoint(BaseModel):
+    """Response schema for a single public viewership data point."""
+    
+    timestamp: datetime = Field(..., description="Measurement timestamp (UTC)")
+    viewers: int = Field(..., description="Concurrent viewer count")
+
+
+class PublicViewershipResponse(BaseModel):
+    """Response schema for public viewership history endpoint."""
+    
+    video_id: str = Field(..., description="YouTube video ID")
+    history: list[PublicViewershipDataPoint] = Field(
+        ..., 
+        description="List of viewership data points"
+    )
+    period_hours: int = Field(..., description="Time period covered in hours")

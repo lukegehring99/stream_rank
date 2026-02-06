@@ -25,6 +25,8 @@ from .viewership import (
     DownsampleInterval,
     DownsampledViewershipResponse,
     DOWNSAMPLE_SECONDS,
+    PublicViewershipDataPoint,
+    PublicViewershipResponse,
 )
 from .common import (
     HealthResponse,
@@ -52,6 +54,8 @@ __all__ = [
     "DownsampleInterval",
     "DownsampledViewershipResponse",
     "DOWNSAMPLE_SECONDS",
+    "PublicViewershipDataPoint",
+    "PublicViewershipResponse",
     # Common
     "HealthResponse",
     "ErrorResponse",

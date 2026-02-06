@@ -14,13 +14,13 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 }) => {
   const sizeClasses = {
     sm: 'w-4 h-4 border-2',
-    md: 'w-8 h-8 border-3',
-    lg: 'w-12 h-12 border-4',
+    md: 'w-6 h-6 border-2',
+    lg: 'w-10 h-10 border-3',
   };
 
   return (
     <div
-      className={clsx('flex flex-col items-center justify-center gap-3', className)}
+      className={clsx('flex flex-col items-center justify-center gap-2', className)}
       role="status"
       aria-label={label}
     >
@@ -31,7 +31,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         )}
       />
       {label && (
-        <span className="text-sm text-slate-500 dark:text-slate-400">
+        <span className="text-xs text-neutral-500 dark:text-neutral-400">
           {label}
         </span>
       )}
@@ -46,24 +46,25 @@ interface SkeletonProps {
 export const Skeleton: React.FC<SkeletonProps> = ({ className }) => (
   <div
     className={clsx(
-      'animate-pulse bg-slate-200 dark:bg-slate-700 rounded',
+      'animate-pulse bg-neutral-100 dark:bg-neutral-800 rounded',
       className
     )}
   />
 );
 
 export const StreamCardSkeleton: React.FC = () => (
-  <div className="card p-4 animate-pulse">
-    <div className="flex gap-4">
-      <Skeleton className="w-12 h-12 rounded-lg flex-shrink-0" />
+  <div className="card p-3 animate-pulse">
+    <div className="flex items-center gap-3">
+      <Skeleton className="w-8 h-8 rounded-lg flex-shrink-0" />
       <div className="flex-1 space-y-2">
-        <Skeleton className="h-5 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
-        <div className="flex gap-2 pt-1">
-          <Skeleton className="h-6 w-16 rounded-full" />
-          <Skeleton className="h-6 w-20 rounded-full" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+        <div className="flex gap-2 pt-0.5">
+          <Skeleton className="h-5 w-12 rounded-full" />
+          <Skeleton className="h-5 w-16 rounded-full" />
         </div>
       </div>
+      <Skeleton className="w-24 h-14 rounded-lg flex-shrink-0" />
     </div>
   </div>
 );
@@ -71,7 +72,7 @@ export const StreamCardSkeleton: React.FC = () => (
 export const StreamListSkeleton: React.FC<{ count?: number }> = ({
   count = 5,
 }) => (
-  <div className="space-y-3">
+  <div className="space-y-2">
     {Array.from({ length: count }, (_, i) => (
       <StreamCardSkeleton key={i} />
     ))}

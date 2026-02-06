@@ -5,17 +5,27 @@ Public API Routes
 Unauthenticated endpoints for public consumption.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings, Settings
 from app.db import get_async_session
-from app.schemas import HealthResponse, TrendingLivestreamsResponse
+from app.schemas import (
+    HealthResponse,
+    TrendingLivestreamsResponse,
+    DownsampleInterval,
+    PublicViewershipDataPoint,
+    PublicViewershipResponse,
+)
 from app.services import LivestreamService, get_cache_service, CacheKeys
+
+
+# Cache TTL for public viewership endpoint (10 minutes)
+PUBLIC_VIEWERSHIP_CACHE_TTL = 600
 
 
 router = APIRouter(tags=["Public"])
@@ -108,3 +118,96 @@ async def get_trending_livestreams(
         count=len(items),
         cached_at=cached_at,
     )
+
+
+@router.get(
+    "/streams/{youtube_id}/viewership",
+    response_model=PublicViewershipResponse,
+    summary="Get Viewership History",
+    description="Get viewership history for a specific YouTube stream.",
+)
+async def get_stream_viewership(
+    youtube_id: Annotated[
+        str,
+        Path(
+            description="YouTube video ID",
+            min_length=11,
+            max_length=11,
+        ),
+    ],
+    hours: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=168,
+            description="Number of hours of history to return (1-168)",
+        ),
+    ] = 24,
+    session: Annotated[AsyncSession, Depends(get_async_session)] = None,
+) -> PublicViewershipResponse:
+    """
+    Get viewership history for a specific stream.
+    
+    Returns a time series of viewer counts for the specified YouTube stream,
+    downsampled to 10-minute intervals for efficient transfer.
+    
+    Results are cached for 10 minutes.
+    
+    Args:
+        youtube_id: YouTube video ID (11 characters)
+        hours: Hours of history to return (default: 24, max: 168)
+    
+    Returns:
+        Viewership history with data points
+    
+    Raises:
+        404: Stream not found
+    """
+    # Check cache first
+    cache_service = get_cache_service()
+    cache_key = CacheKeys.public_viewership(youtube_id, hours)
+    cached_item = cache_service.get(cache_key)
+    
+    if cached_item and not cached_item.is_expired:
+        return cached_item.data
+    
+    # Look up the stream
+    service = LivestreamService(session)
+    livestream = await service.get_by_youtube_id(youtube_id)
+    
+    if not livestream:
+        raise HTTPException(status_code=404, detail="Stream not found")
+    
+    # Calculate time range
+    end_time = datetime.now(timezone.utc)
+    start_time = end_time - timedelta(hours=hours)
+    
+    # Get viewership history with 10-minute downsampling
+    history, _ = await service.get_viewership_history(
+        livestream_id=livestream.id,
+        start_time=start_time,
+        end_time=end_time,
+        skip=0,
+        limit=1000,  # Max data points
+        downsample=DownsampleInterval.TEN_MINUTES,
+    )
+    
+    # Convert to public response format
+    data_points = [
+        PublicViewershipDataPoint(
+            timestamp=entry.timestamp,
+            viewers=entry.viewcount,
+        )
+        for entry in sorted(history, key=lambda x: x.timestamp)
+    ]
+    
+    response = PublicViewershipResponse(
+        video_id=youtube_id,
+        history=data_points,
+        period_hours=hours,
+    )
+    
+    # Cache the response
+    cache_service.set(cache_key, response, ttl_seconds=PUBLIC_VIEWERSHIP_CACHE_TTL)
+    
+    return response
