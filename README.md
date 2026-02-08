@@ -67,8 +67,11 @@ cp .env.example .env
 ### 2. Start Services
 
 ```bash
-# Build and start all services
-docker compose up --build -d
+# Production (mysql + api + worker only)
+docker compose -f docker-compose.yml up --build -d
+
+# Include Admin UI + Widget (uses override file)
+docker compose -f docker-compose.yml -f docker-compose.override.yml up --build -d
 
 # View logs
 docker compose logs -f
@@ -350,11 +353,14 @@ npm test
 ## 🐳 Docker Commands
 
 ```bash
-# Start all services
-docker compose up -d
+# Start production stack (mysql + api + worker only)
+docker compose -f docker-compose.yml up -d
+
+# Start with Admin UI + Widget
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 
 # Rebuild after code changes
-docker compose up --build -d
+docker compose -f docker-compose.yml up --build -d
 
 # View logs
 docker compose logs -f api
@@ -365,7 +371,7 @@ docker compose down
 
 # Reset database
 docker compose down -v
-docker compose up -d
+docker compose -f docker-compose.yml up -d
 
 # Shell into container
 docker compose exec api bash

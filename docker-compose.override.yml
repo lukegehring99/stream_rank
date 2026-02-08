@@ -73,6 +73,10 @@ services:
     build:
       context: ./frontend-admin
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+        VITE_WIDGET_URL: ${VITE_WIDGET_URL:-http://localhost:3000}
+        VITE_WIDGET_GITHUB_URL: ${VITE_WIDGET_GITHUB_URL:-}
     # For development, you might want to use the Vite dev server instead
     # Uncomment below and comment out the build section to use dev server
     # image: node:20-alpine
@@ -85,6 +89,19 @@ services:
     #   - "3001:3001"
     environment:
       NODE_ENV: development
+    ports:
+      - "${ADMIN_PORT:-3001}:80"
+    networks:
+      - streamrank_net
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
 
   # ===================
   # Public Widget (Dev Preview)
