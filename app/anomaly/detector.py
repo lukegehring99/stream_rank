@@ -412,8 +412,10 @@ class AsyncAnomalyDetector:
             AnomalyStatus if validation fails, None if valid
         """
         if recent_data.sample_count < min_recent:
+            #print(f"Validation failed: recent sample count {recent_data.sample_count} < min {min_recent}")
             return AnomalyStatus.INSUFFICIENT_DATA
         if baseline_data.sample_count < min_baseline:
+            #print(f"Validation failed: baseline sample count {baseline_data.sample_count} < min {min_baseline}")
             return AnomalyStatus.INSUFFICIENT_DATA
         
         if recent_data.is_empty:

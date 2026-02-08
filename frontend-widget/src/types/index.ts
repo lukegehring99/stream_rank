@@ -45,7 +45,7 @@ export interface WidgetConfig {
 export const DEFAULT_CONFIG: WidgetConfig = {
   count: 10,
   refreshMinutes: 5,
-  apiBaseUrl: 'http://localhost:8000/api/v1',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
   theme: 'light',
   experimental: false,
 };

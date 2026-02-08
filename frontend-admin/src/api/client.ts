@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { ApiError, AnomalyConfigEntry, AnomalyConfigListResponse } from '../types';
 
-const BASE_URL = '/api/v1';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
@@ -30,8 +30,9 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       // Clear token and redirect to login
       localStorage.removeItem('access_token');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      const loginPath = `${import.meta.env.BASE_URL || '/'}login`;
+      if (window.location.pathname !== loginPath) {
+        window.location.href = loginPath;
       }
     }
     return Promise.reject(error);
