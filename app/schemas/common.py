@@ -79,3 +79,68 @@ class DashboardStats(BaseModel):
         ...,
         description="Peak concurrent viewers recorded today",
     )
+
+
+# ============================================================================
+# Anomaly Config Schemas
+# ============================================================================
+
+class AnomalyConfigEntry(BaseModel):
+    """Single anomaly config entry."""
+    
+    key: str = Field(
+        ...,
+        description="Configuration key (dot notation for nested params)",
+        examples=["algorithm", "quantile_params.baseline_percentile"],
+    )
+    type: str = Field(
+        ...,
+        description="Python type name",
+        examples=["str", "int", "float", "bool"],
+    )
+    value: str = Field(
+        ...,
+        description="Stringified configuration value",
+        examples=["quantile", "75.0", "true"],
+    )
+    is_default: bool = Field(
+        default=True,
+        description="Whether this is the default value",
+    )
+
+
+class AnomalyConfigListResponse(BaseModel):
+    """List of all anomaly config entries."""
+    
+    items: list[AnomalyConfigEntry] = Field(
+        ...,
+        description="List of configuration entries",
+    )
+
+
+class AnomalyConfigUpdateRequest(BaseModel):
+    """Request to update an anomaly config value."""
+    
+    key: str = Field(
+        ...,
+        description="Configuration key to update",
+        examples=["algorithm", "quantile_params.spike_threshold"],
+    )
+    value: str = Field(
+        ...,
+        description="New value (will be validated and parsed)",
+        examples=["zscore", "2.0"],
+    )
+
+
+class AnomalyConfigUpdateResponse(BaseModel):
+    """Response after updating a config value."""
+    
+    success: bool = Field(
+        default=True,
+        description="Whether the update succeeded",
+    )
+    entry: AnomalyConfigEntry = Field(
+        ...,
+        description="Updated configuration entry",
+    )

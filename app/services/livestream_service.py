@@ -512,7 +512,11 @@ class LivestreamService:
         
         return history, total
     
-    async def get_trending(self, count: int = 10) -> list[LivestreamRankedResponse]:
+    async def get_trending(
+        self, 
+        count: int = 10, 
+        experimental: bool = False,
+    ) -> list[LivestreamRankedResponse]:
         """
         Get trending livestreams ranked by anomaly/trend score.
         
@@ -521,25 +525,32 @@ class LivestreamService:
         
         Args:
             count: Number of items to return (max 100)
+            experimental: If True, bypass cache and use DB-stored config
         
         Returns:
             List of ranked livestreams with viewer data and trend scores
         """
-        # Check cache first
-        cached = self.cache.get(CacheKeys.TRENDING_LIVESTREAMS)
-        if cached and not cached.is_expired:
-            # Return requested count from cached data
-            return cached.data[:count]
-        
-        # Get settings for anomaly configuration
-        settings = get_settings()
+        # Check cache first (skip if experimental mode)
+        if not experimental:
+            cached = self.cache.get(CacheKeys.TRENDING_LIVESTREAMS)
+            if cached and not cached.is_expired:
+                # Return requested count from cached data
+                return cached.data[:count]
         
         # Configure anomaly detector
-        config = AnomalyConfig(
-            algorithm=getattr(settings, 'anomaly_algorithm', 'quantile'),
-            recent_window_minutes=getattr(settings, 'anomaly_recent_window_minutes', 15),
-            baseline_hours=getattr(settings, 'anomaly_baseline_hours', 24),
-        )
+        if experimental:
+            # Use config from database for experimental mode
+            from app.services.anomaly_config_service import AnomalyConfigService
+            config_service = AnomalyConfigService(self.session)
+            config = await config_service.build_anomaly_config()
+        else:
+            # Use settings for normal mode
+            settings = get_settings()
+            config = AnomalyConfig(
+                algorithm=settings.anomaly_algorithm,
+                recent_window_minutes=settings.anomaly_recent_window_minutes,
+                baseline_hours=settings.anomaly_baseline_hours,
+            )
         
         # Run anomaly detection
         detector = AsyncAnomalyDetector(self.session, config)
@@ -574,8 +585,9 @@ class LivestreamService:
             for item, score in zip(ranked_items, scores):
                 item.id = id_map.get(score.livestream_id, item.id)
         
-        # Cache the results
-        self.cache.set(CacheKeys.TRENDING_LIVESTREAMS, ranked_items)
+        # Cache the results (only for non-experimental mode)
+        if not experimental:
+            self.cache.set(CacheKeys.TRENDING_LIVESTREAMS, ranked_items)
         
         return ranked_items[:count]
 

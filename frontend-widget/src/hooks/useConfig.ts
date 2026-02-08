@@ -36,6 +36,12 @@ function parseQueryParams(): Partial<WidgetConfig> {
     config.theme = theme;
   }
 
+  // Hidden experimental flag - not exposed in public UI
+  const experimental = params.get('experimental');
+  if (experimental === 'true' || experimental === '1') {
+    config.experimental = true;
+  }
+
   return config;
 }
 

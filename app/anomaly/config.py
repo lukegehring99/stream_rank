@@ -122,8 +122,8 @@ class AnomalyConfig:
     baseline_hours: int = 24
     
     # Minimum sample requirements
-    min_recent_samples: int = 3
-    min_baseline_samples: int = 10
+    min_recent_samples: int = 10
+    min_baseline_samples: int = 1000
     
     # Algorithm selection
     algorithm: Literal["quantile", "zscore"] = "quantile"
@@ -138,6 +138,10 @@ class AnomalyConfig:
     
     # Inactive stream handling
     inactive_threshold_minutes: int = 60
+
+    # Logistic normalization parameters
+    logistic_midpoint: float = 0.0
+    logistic_steepness: float = 1.0
     
     def __post_init__(self):
         if self.recent_window_minutes < 5:

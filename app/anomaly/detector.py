@@ -397,6 +397,42 @@ class AsyncAnomalyDetector:
         self.session = session
         self.config = config or AnomalyConfig()
         self.strategy = strategy or AnomalyStrategyFactory.create(self.config)
+
+    def validate_data(
+        self,
+        recent_data: ViewershipData,
+        baseline_data: ViewershipData,
+        min_recent: int,
+        min_baseline: int,
+    ) -> Optional[AnomalyStatus]:
+        """
+        Validate input data meets minimum requirements and if the stream is inactive.
+        
+        Returns:
+            AnomalyStatus if validation fails, None if valid
+        """
+        if recent_data.sample_count < min_recent:
+            return AnomalyStatus.INSUFFICIENT_DATA
+        if baseline_data.sample_count < min_baseline:
+            return AnomalyStatus.INSUFFICIENT_DATA
+        
+        if recent_data.is_empty:
+            return AnomalyStatus.INACTIVE
+            
+        recent_median = np.median(recent_data.viewcounts)
+        recent_max = np.max(recent_data.viewcounts)
+        
+        # Check for zero viewership
+        if recent_median == 0 and recent_max == 0:
+            return AnomalyStatus.INACTIVE
+        
+        # Check for dramatic drop from baseline
+        if not baseline_data.is_empty:
+            baseline_median = np.median(baseline_data.viewcounts)
+            if baseline_median > 100 and recent_max < baseline_median * 0.01:
+                return AnomalyStatus.INACTIVE
+        
+        return None
     
     async def detect_all_live_streams(
         self,
@@ -414,6 +450,8 @@ class AsyncAnomalyDetector:
         Returns:
             List of AnomalyScore objects sorted by score descending
         """
+        #print(f"Running anomaly detection with config: {self.config}")
+
         # Get all live streams
         result = await self.session.execute(
             select(Livestream).where(Livestream.is_live == True)
@@ -460,12 +498,13 @@ class AsyncAnomalyDetector:
         
         # Check for inactive stream (no data)
         if all_data.is_empty:
+            #print(f"Stream {livestream.id} has no viewership data. Marking as INACTIVE.")
             return AnomalyScore(
                 livestream_id=livestream.id,
                 youtube_video_id=livestream.youtube_video_id,
                 name=livestream.name,
                 channel=livestream.channel,
-                score=0.0,
+                score=self.config.score_min,
                 status=AnomalyStatus.INACTIVE,
                 algorithm=self.strategy.name,
                 metadata={'reason': 'No viewership data found'},
@@ -478,6 +517,28 @@ class AsyncAnomalyDetector:
         
         recent_data = all_data.slice_recent(recent_cutoff)
         baseline_data = all_data.slice_baseline(baseline_begin, baseline_end)
+
+        # Validate data meets minimum requirements
+        validation_status = self.validate_data(
+            recent_data,
+            baseline_data,
+            self.config.min_recent_samples,
+            self.config.min_baseline_samples,
+        )
+
+        if validation_status is not None:
+            #print(f"Stream {livestream.id} failed validation: {validation_status}")
+            return AnomalyScore(
+                livestream_id=livestream.id,
+                youtube_video_id=livestream.youtube_video_id,
+                name=livestream.name,
+                channel=livestream.channel,
+                score=self.config.score_min,
+                status=validation_status,
+                current_viewcount=recent_data.latest_viewcount,
+                algorithm=self.strategy.name,
+                metadata={'reason': str(validation_status)},
+            )
         
         # Run detection strategy
         score = self.strategy.compute_score(recent_data, baseline_data)

@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { ApiError } from '../types';
+import { ApiError, AnomalyConfigEntry, AnomalyConfigListResponse } from '../types';
 
 const BASE_URL = '/api/v1';
 
@@ -122,4 +122,35 @@ export const extractVideoId = (urlOrId: string): string => {
 
   // Return as-is if no pattern matches (let the backend validate)
   return urlOrId;
+};
+
+// Anomaly Config API
+export const anomalyConfigApi = {
+  getAll: async (): Promise<AnomalyConfigListResponse> => {
+    const response = await apiClient.get('/admin/anomaly-config');
+    return response.data;
+  },
+
+  update: async (key: string, value: string): Promise<{ success: boolean; entry: AnomalyConfigEntry }> => {
+    const response = await apiClient.put('/admin/anomaly-config', { key, value });
+    return response.data;
+  },
+
+  reset: async (key: string): Promise<{ success: boolean; entry: AnomalyConfigEntry }> => {
+    const response = await apiClient.delete(`/admin/anomaly-config/${key}`);
+    return response.data;
+  },
+};
+
+// Public API (for fetching experimental data)
+export const publicApi = {
+  getTrending: async (count: number = 10) => {
+    const response = await apiClient.get(`/livestreams?count=${count}`);
+    return response.data;
+  },
+
+  getExperimentalTrending: async (count: number = 10) => {
+    const response = await apiClient.get(`/livestreams/experimental?count=${count}`);
+    return response.data;
+  },
 };

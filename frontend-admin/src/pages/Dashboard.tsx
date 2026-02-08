@@ -238,7 +238,7 @@ export const Dashboard: React.FC = () => {
                     >
                       {stream.is_live ? 'live' : 'offline'}
                     </span>
-                    {stream.current_viewers !== undefined && (
+                    {stream.current_viewers != null && (
                       <span className="text-sm text-gray-500">
                         {formatViewers(stream.current_viewers)} viewers
                       </span>

@@ -5,6 +5,11 @@ Services Module
 Business logic and service layer implementations.
 """
 
+from .anomaly_config_service import (
+    AnomalyConfigService,
+    get_valid_keys,
+    get_default_values,
+)
 from .cache_service import (
     CacheService,
     CachedItem,
@@ -24,6 +29,9 @@ from .youtube_service import (
 from .user_service import sync_user_passwords
 
 __all__ = [
+    "AnomalyConfigService",
+    "get_valid_keys",
+    "get_default_values",
     "CacheService",
     "CachedItem",
     "CacheKeys",

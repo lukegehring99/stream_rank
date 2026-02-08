@@ -45,6 +45,11 @@ from app.anomaly.detector import (
     detect_anomalies,
     detect_anomalies_async,
 )
+from app.anomaly.logistic import (
+    logistic_normalize,
+    logistic_normalize_batch,
+    inverse_logistic,
+)
 
 __all__ = [
     # Configuration
@@ -65,4 +70,8 @@ __all__ = [
     'AsyncAnomalyDetector',
     'detect_anomalies',
     'detect_anomalies_async',
+    # Logistic Normalization
+    'logistic_normalize',
+    'logistic_normalize_batch',
+    'inverse_logistic',
 ]

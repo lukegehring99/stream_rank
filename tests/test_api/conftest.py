@@ -8,6 +8,7 @@ Shared fixtures for API testing.
 import asyncio
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Generator
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -168,3 +169,15 @@ async def admin_token(
 async def auth_headers(admin_token: str) -> dict:
     """Get authorization headers with admin token."""
     return {"Authorization": f"Bearer {admin_token}"}
+
+
+@pytest.fixture(autouse=True)
+def mock_youtube_service():
+    """Mock YouTube service for all tests to avoid real API calls."""
+    mock_service = MagicMock()
+    
+    # Mock validate_video_exists to return None (API not configured behavior)
+    mock_service.validate_video_exists = AsyncMock(return_value=None)
+    
+    with patch('app.services.livestream_service.get_youtube_service', return_value=mock_service):
+        yield mock_service

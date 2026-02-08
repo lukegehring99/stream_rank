@@ -99,3 +99,32 @@ export interface EditLivestreamForm {
   channel: string;
   is_live: boolean;
 }
+
+// Anomaly Config types
+export interface AnomalyConfigEntry {
+  key: string;
+  type: 'str' | 'int' | 'float' | 'bool';
+  value: string;
+  is_default: boolean;
+}
+
+export interface AnomalyConfigListResponse {
+  items: AnomalyConfigEntry[];
+}
+
+// Trending response types
+export interface TrendingItem {
+  id: string;
+  youtube_video_id: string;
+  name: string;
+  channel: string;
+  current_viewers: number;
+  rank: number;
+  trend_score: number | null;
+}
+
+export interface TrendingResponse {
+  items: TrendingItem[];
+  count: number;
+  cached_at: string | null;
+}

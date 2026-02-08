@@ -27,7 +27,8 @@ const USE_MOCK_DATA = import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_API;
 export function useStreams(
   apiBaseUrl: string,
   count: number,
-  refreshMinutes: number
+  refreshMinutes: number,
+  experimental = false
 ): UseStreamsReturn {
   const [streams, setStreams] = useState<Livestream[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +48,7 @@ export function useStreams(
         await new Promise((resolve) => setTimeout(resolve, 500));
         data = generateMockStreams(count);
       } else {
-        data = await fetchTrendingStreams(apiBaseUrl, count);
+        data = await fetchTrendingStreams(apiBaseUrl, count, experimental);
       }
 
       setStreams(data);
@@ -61,7 +62,7 @@ export function useStreams(
     } finally {
       setLoading(false);
     }
-  }, [apiBaseUrl, count]);
+  }, [apiBaseUrl, count, experimental]);
 
   useEffect(() => {
     fetchData();

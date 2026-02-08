@@ -41,12 +41,10 @@ Algorithm Steps:
 2. Compute recent representative value (mean or high percentile)
 3. Calculate Z-score or Modified Z-score
 4. If Z-score > threshold → trending
-5. Normalize to 0-100 scale
+5. Apply logistic normalization to map to 0-100 scale
 
-Edge Cases:
-- Zero standard deviation: Apply minimum floor
-- Negative Z-scores: Optionally clamp to 0 (we only care about spikes)
-- New streams: Return INSUFFICIENT_DATA
+Note: Data validation (insufficient data, inactive streams) is handled by
+the AsyncAnomalyDetector orchestration layer, not by individual strategies.
 """
 
 from dataclasses import dataclass
@@ -55,6 +53,7 @@ from typing import Optional
 import numpy as np
 
 from app.anomaly.config import AnomalyConfig, ZScoreParams
+from app.anomaly.logistic import logistic_normalize
 from app.anomaly.protocol import (
     AnomalyStrategy,
     AnomalyScore,
@@ -142,28 +141,8 @@ class ZScoreStrategy:
         Returns:
             AnomalyScore with Z-score and statistics
         """
-        # Validate data sufficiency
-        validation_status = self.validate_data(
-            recent_data,
-            baseline_data,
-            self.config.min_recent_samples,
-            self.config.min_baseline_samples,
-        )
-        
-        if validation_status is not None:
-            return self._make_error_score(
-                recent_data,
-                validation_status,
-                reason="Insufficient data points",
-            )
-        
-        # Check for inactive stream
-        if self._is_inactive(recent_data, baseline_data):
-            return self._make_error_score(
-                recent_data,
-                AnomalyStatus.INACTIVE,
-                reason="Stream appears inactive",
-            )
+        # Note: Data validation (insufficient data, inactive streams) is handled
+        # by the AsyncAnomalyDetector, not by individual strategies.
         
         # Extract viewcount arrays as float for calculations
         recent_views = recent_data.viewcounts.astype(np.float64)
@@ -188,8 +167,9 @@ class ZScoreStrategy:
         baseline_std = float(np.std(baseline_views))
         recent_mean = float(np.mean(recent_views))
         
-        # Normalize to 0-100 score
-        normalized_score = self._normalize_score(z_score)
+        # Apply logistic normalization to map z-score to 0-100 scale
+        # The logistic function provides smooth S-curve mapping
+        normalized_score = logistic_normalize(z_score, self.config)
         
         # Determine status
         status = (

@@ -11,12 +11,28 @@ import {
 import { ViewershipDataPoint, formatViewerCount } from '../types';
 import { LoadingSpinner } from './LoadingSpinner';
 
+// Format viewer count for Y-axis with integers only (no decimals)
+const formatViewerCountInteger = (count: number): string => {
+  if (count >= 1_000_000) {
+    return `${Math.round(count / 1_000_000)}M`;
+  }
+  if (count >= 1_000) {
+    return `${Math.round(count / 1_000)}K`;
+  }
+  return Math.round(count).toLocaleString();
+};
+
 interface ViewershipChartProps {
   data: ViewershipDataPoint[];
   loading: boolean;
   error: string | null;
   theme: 'light' | 'dark';
 }
+
+// Parse UTC timestamp (backend returns timestamps without Z suffix)
+const parseUTC = (timestamp: string) => {
+  return new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
+};
 
 export const ViewershipChart: React.FC<ViewershipChartProps> = ({
   data,
@@ -25,14 +41,27 @@ export const ViewershipChart: React.FC<ViewershipChartProps> = ({
   theme,
 }) => {
   const chartData = useMemo(() => {
-    return data.map((point) => ({
-      ...point,
-      time: new Date(point.timestamp).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      formattedViewers: formatViewerCount(point.viewers),
-    }));
+    return data.map((point) => {
+      const date = parseUTC(point.timestamp);
+      return {
+        ...point,
+        time: date.toLocaleString([], {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        tooltipTime: date.toLocaleString([], {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        formattedViewers: formatViewerCount(point.viewers),
+      };
+    });
   }, [data]);
 
   // Vibrant Canva-inspired color scheme
@@ -137,16 +166,18 @@ export const ViewershipChart: React.FC<ViewershipChartProps> = ({
             tick={{ fill: currentColors.text, fontSize: 10 }}
             tickLine={false}
             axisLine={{ stroke: currentColors.grid }}
-            interval="preserveStartEnd"
-            minTickGap={50}
+            interval="equidistantPreserveStart"
+            tickMargin={15}
+            padding={{ left: 10, right: 10 }}
           />
           <YAxis
             tick={{ fill: currentColors.text, fontSize: 10 }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={formatViewerCount}
+            tickFormatter={formatViewerCountInteger}
             domain={[minViewers - padding, maxViewers + padding]}
             width={45}
+            allowDecimals={false}
           />
           <Tooltip
             contentStyle={{
@@ -166,7 +197,12 @@ export const ViewershipChart: React.FC<ViewershipChartProps> = ({
               formatViewerCount(value) + ' viewers',
               '',
             ]}
-            labelFormatter={(label) => `${label}`}
+            labelFormatter={(_label, payload) => {
+              if (payload && payload.length > 0) {
+                return payload[0].payload.tooltipTime;
+              }
+              return _label;
+            }}
           />
           <Area
             type="monotone"

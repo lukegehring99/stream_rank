@@ -306,6 +306,90 @@ class ViewershipHistory(Base):
         return result.rowcount
 
 
+class AnomalyConfigEntry(Base):
+    """
+    Anomaly detection configuration entry.
+    
+    Stores key-value pairs for anomaly detection algorithm parameters.
+    Keys use dot notation for nested parameters (e.g., 'quantile_params.baseline_percentile').
+    """
+    __tablename__ = 'anomaly_config'
+    __table_args__ = (
+        Index('idx_anomaly_config_key', 'key'),
+        {
+            'mysql_engine': 'InnoDB',
+            'mysql_charset': 'utf8mb4',
+            'mysql_collate': 'utf8mb4_unicode_ci',
+            'comment': 'Anomaly detection configuration',
+        }
+    )
+
+    # Primary key
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    
+    # Parameter key (e.g., 'algorithm', 'quantile_params.baseline_percentile')
+    key: Mapped[str] = mapped_column(
+        String(100),
+        unique=True,
+        nullable=False,
+        comment='Parameter key with dot notation for nested params',
+    )
+    
+    # Python type (str, int, float, bool)
+    type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        comment='Python type name',
+    )
+    
+    # Stringified value
+    value: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment='Stringified parameter value',
+    )
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=func.now(),
+    )
+    
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=func.now(),
+        onupdate=func.now(),
+    )
+
+    def __repr__(self) -> str:
+        return f"<AnomalyConfigEntry(key='{self.key}', value='{self.value}')>"
+    
+    def to_dict(self) -> dict:
+        """Convert model to dictionary for API responses."""
+        return {
+            'key': self.key,
+            'type': self.type,
+            'value': self.value,
+        }
+    
+    def get_typed_value(self):
+        """Convert string value to appropriate Python type."""
+        if self.type == 'int':
+            return int(self.value)
+        elif self.type == 'float':
+            return float(self.value)
+        elif self.type == 'bool':
+            return self.value.lower() in ('true', '1', 'yes')
+        else:
+            return self.value
+
+
 class User(Base):
     """
     Admin user account for authentication.

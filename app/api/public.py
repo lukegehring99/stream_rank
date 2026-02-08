@@ -121,6 +121,52 @@ async def get_trending_livestreams(
 
 
 @router.get(
+    "/livestreams/experimental",
+    response_model=TrendingLivestreamsResponse,
+    summary="Get Experimental Trending Livestreams",
+    description="Get trending livestreams using experimental anomaly detection settings.",
+)
+async def get_experimental_trending_livestreams(
+    count: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=100,
+            description="Number of livestreams to return (1-100)",
+        ),
+    ] = 10,
+    session: Annotated[AsyncSession, Depends(get_async_session)] = None,
+    settings: Annotated[Settings, Depends(get_settings)] = None,
+) -> TrendingLivestreamsResponse:
+    """
+    Get trending livestreams using experimental settings.
+    
+    This endpoint bypasses the cache and uses anomaly detection
+    configuration stored in the database. Use this to test
+    different algorithm configurations before applying them.
+    
+    Args:
+        count: Number of items to return (default: 10, max: 100)
+    
+    Returns:
+        Ranked list of trending livestreams with viewer counts
+        (not cached, uses experimental config)
+    """
+    # Clamp count to configured maximum
+    max_count = min(count, settings.max_livestreams_count)
+    
+    # Fetch trending data with experimental flag (bypasses cache, uses DB config)
+    service = LivestreamService(session)
+    items = await service.get_trending(count=max_count, experimental=True)
+    
+    return TrendingLivestreamsResponse(
+        items=items,
+        count=len(items),
+        cached_at=None,  # Experimental mode doesn't use cache
+    )
+
+
+@router.get(
     "/streams/{youtube_id}/viewership",
     response_model=PublicViewershipResponse,
     summary="Get Viewership History",

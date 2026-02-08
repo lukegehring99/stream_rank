@@ -13,9 +13,16 @@ app/anomaly/
 ├── protocol.py          # Strategy interface (Protocol)
 ├── quantile_strategy.py # Quantile-based algorithm
 ├── zscore_strategy.py   # Z-score based algorithm
+├── logistic.py          # Logistic normalization functions
 ├── factory.py           # Strategy factory
 └── detector.py          # High-level orchestration
 ```
+
+### Key Design Decisions
+
+1. **Strategy Pattern**: Algorithms are interchangeable via the `AnomalyStrategy` protocol
+2. **Logistic Normalization**: All raw scores are normalized using a sigmoid function for consistent 0-100 output
+3. **Centralized Validation**: Data validation (insufficient data, inactive streams) is handled by `AsyncAnomalyDetector`, not individual strategies
 
 ## Quick Start
 
@@ -92,10 +99,21 @@ $$\text{spike\_ratio} = \frac{P_{recent}}{P_{baseline}}$$
 **Step 4: Determine Trend Status**
 $$\text{status} = \begin{cases} \text{TRENDING} & \text{if spike\_ratio} \geq 1.5 \\ \text{NORMAL} & \text{otherwise} \end{cases}$$
 
-**Step 5: Normalize Score (0-100)**
-$$\text{score} = \text{clip}\left(\frac{\text{spike\_ratio} - 1.0}{3.0 - 1.0} \times 100, 0, 100\right)^{0.8}$$
+**Step 5: Apply Logistic Normalization (0-100)**
 
-The power of 0.8 provides a slight curve for better score distribution.
+The raw spike ratio is normalized using a logistic (sigmoid) function:
+
+$$\text{score} = \text{min} + \frac{\text{max} - \text{min}}{1 + e^{-k(\text{ratio} - m)}}$$
+
+Where:
+- $k = 0.1$ — steepness of the sigmoid curve
+- $m = 0$ — midpoint (ratio of 0 maps to score 50)
+- min/max from `AnomalyConfig.score_min` and `score_max`
+
+This provides:
+- Smooth S-curve mapping that compresses extreme values
+- Good resolution in the middle range
+- Scores centered at 50 for "normal" ratios around 1.0
 
 #### Why Quantiles?
 
@@ -155,18 +173,27 @@ The constant 0.6745 is the 75th percentile of the standard normal distribution, 
 
 Livestream viewership is often **heavily skewed** (many streams have few viewers, some have millions), making MAD the preferred choice.
 
-#### Normalization to 0-100
+#### Normalization to 0-100 (Logistic Function)
 
-$$\text{score} = \frac{100}{1 + e^{-k(z - \theta)}}$$
+Both algorithms use a logistic (sigmoid) function for score normalization:
+
+$$\text{score} = \text{min} + \frac{\text{max} - \text{min}}{1 + e^{-k(x - m)}}$$
 
 Where:
-- $k = 1.0$ — steepness of sigmoid
-- $\theta$ = z-score threshold (default 2.0)
+- $x$ = raw score (spike_ratio for Quantile, z-score for Z-Score)
+- $k = 0.1$ — steepness of sigmoid (configurable)
+- $m = 0$ — midpoint value that maps to 50
+
+**Why Logistic Normalization?**
+- Compresses extreme outliers smoothly
+- Maintains good resolution in the middle range
+- Continuous and differentiable
+- Bounded output (always within [min, max])
 
 This sigmoid normalization gives:
-- Score ≈ 50 when $z = \theta$ (threshold)
-- Score → 100 as $z \to \infty$
-- Score → 0 as $z \to 0$
+- Score = 50 when $x = m$ (midpoint)
+- Score → max as $x \to +\infty$  
+- Score → min as $x \to -\infty$
 
 #### Configuration Parameters
 
@@ -281,6 +308,7 @@ strategy = AnomalyStrategyFactory.create(config)
 |-------|---------|
 | `AnomalyConfig` | Configuration for detection |
 | `AnomalyDetector` | High-level orchestration |
+| `AsyncAnomalyDetector` | Async orchestration for FastAPI |
 | `AnomalyStrategyFactory` | Strategy creation |
 | `AnomalyScore` | Detection result container |
 | `ViewershipData` | Time-series data container |
@@ -291,6 +319,27 @@ strategy = AnomalyStrategyFactory.create(config)
 |----------|------------|-------------|
 | `QuantileStrategy` | `'quantile'` | Percentile-based detection |
 | `ZScoreStrategy` | `'zscore'` | Standard deviation-based detection |
+
+### Logistic Normalization Functions
+
+```python
+from app.anomaly import logistic_normalize, logistic_normalize_batch, inverse_logistic
+
+# Normalize a single score
+score = logistic_normalize(spike_ratio, config, midpoint=0.0, steepness=0.1)
+
+# Normalize a batch
+scores = logistic_normalize_batch([1.0, 1.5, 2.0, 3.0], config)
+
+# Inverse operation (recover raw score from normalized)
+raw = inverse_logistic(75.0, config)
+```
+
+| Function | Purpose |
+|----------|---------|
+| `logistic_normalize` | Apply sigmoid normalization to a single score |
+| `logistic_normalize_batch` | Normalize a list of scores |
+| `inverse_logistic` | Recover raw score from normalized value |
 
 ### Status Codes
 

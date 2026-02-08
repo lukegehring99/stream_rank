@@ -87,14 +87,13 @@ YouTube Data API
          ▼
 ┌─────────────────────────────────────────────────────┐
 │  Anomaly Detection (Strategy Pattern)               │
-│  ┌───────────────┐  ┌───────────────┐              │
-│  │ Z-Score       │  │ Percent       │              │
-│  │ Strategy      │  │ Change        │              │
-│  └───────────────┘  └───────────────┘              │
-│  ┌───────────────┐  ┌───────────────┐              │
-│  │ Moving Avg    │  │ Custom        │              │
-│  │ Strategy      │  │ Strategy      │              │
-│  └───────────────┘  └───────────────┘              │
+│  ┌───────────────┐  ┌───────────────┐               │
+│  │ Quantile      │  │ Z-Score       │               │
+│  │ Strategy      │  │ Strategy      │               │
+│  └───────────────┘  └───────────────┘               │
+│                                                     │
+│  All strategies use logistic normalization to       │
+│  map raw scores to 0-100 scale (sigmoid function)   │
 └────────┬────────────────────────────────────────────┘
          │
          ▼

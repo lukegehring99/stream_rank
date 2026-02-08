@@ -171,6 +171,24 @@ class Settings(BaseSettings):
         description="Allowed HTTP headers",
     )
     
+    # =========================================================================
+    # Anomaly Detection Settings
+    # =========================================================================
+    anomaly_algorithm: str = Field(
+        default="quantile",
+        description="Anomaly detection algorithm: 'quantile' or 'zscore'",
+    )
+    anomaly_recent_window_minutes: int = Field(
+        default=15,
+        ge=1,
+        description="Recent window in minutes for anomaly detection",
+    )
+    anomaly_baseline_hours: int = Field(
+        default=24,
+        ge=1,
+        description="Baseline period in hours for anomaly detection",
+    )
+    
     @property
     def cors_origins_list(self) -> list[str]:
         """Convert CORS origins string to list."""

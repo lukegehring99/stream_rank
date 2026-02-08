@@ -41,9 +41,11 @@ async function fetchWithTimeout(
 
 export async function fetchTrendingStreams(
   baseUrl: string,
-  count: number
+  count: number,
+  experimental = false
 ): Promise<Livestream[]> {
-  const url = `${baseUrl}/livestreams?count=${count}`;
+  const endpoint = experimental ? 'livestreams/experimental' : 'livestreams';
+  const url = `${baseUrl}/${endpoint}?count=${count}`;
 
   try {
     const response = await fetchWithTimeout(url);

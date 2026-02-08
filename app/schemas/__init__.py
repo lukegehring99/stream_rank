@@ -33,6 +33,10 @@ from .common import (
     ErrorResponse,
     PaginatedResponse,
     DashboardStats,
+    AnomalyConfigEntry,
+    AnomalyConfigListResponse,
+    AnomalyConfigUpdateRequest,
+    AnomalyConfigUpdateResponse,
 )
 
 __all__ = [
@@ -61,4 +65,9 @@ __all__ = [
     "ErrorResponse",
     "PaginatedResponse",
     "DashboardStats",
+    # Anomaly Config
+    "AnomalyConfigEntry",
+    "AnomalyConfigListResponse",
+    "AnomalyConfigUpdateRequest",
+    "AnomalyConfigUpdateResponse",
 ]

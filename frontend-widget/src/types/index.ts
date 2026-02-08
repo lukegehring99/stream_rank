@@ -39,6 +39,7 @@ export interface WidgetConfig {
   refreshMinutes: number;
   apiBaseUrl: string;
   theme: 'light' | 'dark';
+  experimental?: boolean; // Hidden option for using experimental endpoint
 }
 
 export const DEFAULT_CONFIG: WidgetConfig = {
@@ -46,6 +47,7 @@ export const DEFAULT_CONFIG: WidgetConfig = {
   refreshMinutes: 5,
   apiBaseUrl: 'http://localhost:8000/api/v1',
   theme: 'light',
+  experimental: false,
 };
 
 // Trend status helper (used for categorizing trend scores)

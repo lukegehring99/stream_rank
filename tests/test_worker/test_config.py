@@ -33,8 +33,9 @@ class TestWorkerSettings:
         monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
         get_worker_settings.cache_clear()
         
+        # Create a settings class that doesn't read from .env file
         with pytest.raises(ValidationError):
-            WorkerSettings()  # No API key
+            WorkerSettings(_env_file=None)  # Disable .env file reading
     
     def test_poll_interval_validation(self, monkeypatch):
         """Test poll interval validation."""

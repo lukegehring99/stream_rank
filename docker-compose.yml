@@ -63,6 +63,11 @@ services:
       CACHE_TTL_MINUTES: ${CACHE_TTL_MINUTES:-5}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       
+      # Anomaly Detection
+      ANOMALY_ALGORITHM: ${ANOMALY_ALGORITHM:-quantile}
+      ANOMALY_RECENT_WINDOW_MINUTES: ${ANOMALY_RECENT_WINDOW_MINUTES:-15}
+      ANOMALY_BASELINE_HOURS: ${ANOMALY_BASELINE_HOURS:-24}
+      
       # YouTube API (for video validation)
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
       

@@ -21,8 +21,12 @@ from app.schemas import (
     ViewershipHistoryListResponse,
     DashboardStats,
     DownsampleInterval,
+    AnomalyConfigEntry,
+    AnomalyConfigListResponse,
+    AnomalyConfigUpdateRequest,
+    AnomalyConfigUpdateResponse,
 )
-from app.services import LivestreamService
+from app.services import LivestreamService, AnomalyConfigService
 
 
 router = APIRouter(
@@ -371,4 +375,131 @@ async def get_viewership_history(
         start_time=start_time,
         end_time=end_time,
         downsample=downsample,
+    )
+
+
+# ============================================================================
+# Anomaly Config Endpoints
+# ============================================================================
+
+@router.get(
+    "/anomaly-config",
+    response_model=AnomalyConfigListResponse,
+    summary="Get Anomaly Detection Configuration",
+    description="Get all anomaly detection configuration parameters.",
+)
+async def get_anomaly_config(
+    current_user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> AnomalyConfigListResponse:
+    """
+    Get all anomaly detection configuration entries.
+    
+    Returns entries for all valid configuration keys, including:
+    - algorithm: Detection algorithm ('quantile' or 'zscore')
+    - Time window settings
+    - Algorithm-specific parameters
+    
+    Requires admin authentication.
+    
+    Returns:
+        List of configuration entries with current values
+    """
+    service = AnomalyConfigService(session)
+    entries = await service.get_all()
+    
+    return AnomalyConfigListResponse(
+        items=[AnomalyConfigEntry(**entry) for entry in entries]
+    )
+
+
+@router.put(
+    "/anomaly-config",
+    response_model=AnomalyConfigUpdateResponse,
+    summary="Update Anomaly Detection Configuration",
+    description="Update a single anomaly detection configuration parameter.",
+)
+async def update_anomaly_config(
+    current_user: CurrentUser,
+    data: AnomalyConfigUpdateRequest,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> AnomalyConfigUpdateResponse:
+    """
+    Update an anomaly detection configuration value.
+    
+    The key must be a valid configuration parameter. The value will be
+    validated and parsed according to the parameter's expected type.
+    
+    Requires admin authentication.
+    
+    Args:
+        data: Configuration update request with key and value
+    
+    Returns:
+        Updated configuration entry
+    
+    Raises:
+        HTTPException: 400 if key is invalid or value cannot be parsed
+    """
+    service = AnomalyConfigService(session)
+    
+    try:
+        result = await service.set_value(data.key, data.value)
+        if result is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid configuration key: {data.key}",
+            )
+        
+        return AnomalyConfigUpdateResponse(
+            success=True,
+            entry=AnomalyConfigEntry(**result),
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+
+@router.delete(
+    "/anomaly-config/{key:path}",
+    response_model=AnomalyConfigUpdateResponse,
+    summary="Reset Anomaly Config to Default",
+    description="Reset a configuration parameter to its default value.",
+)
+async def reset_anomaly_config(
+    key: str,
+    current_user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> AnomalyConfigUpdateResponse:
+    """
+    Reset a configuration value to its default.
+    
+    Removes the custom value from the database, causing the default
+    to be used on subsequent reads.
+    
+    Requires admin authentication.
+    
+    Args:
+        key: Configuration key to reset
+    
+    Returns:
+        Default configuration entry
+    
+    Raises:
+        HTTPException: 400 if key is invalid
+    """
+    service = AnomalyConfigService(session)
+    result = await service.reset_to_default(key)
+    
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid configuration key: {key}",
+        )
+    
+    return AnomalyConfigUpdateResponse(
+        success=True,
+        entry=AnomalyConfigEntry(**result),
     )

@@ -11,7 +11,8 @@ const App: React.FC = () => {
   const { streams, loading, error, lastUpdated, refresh } = useStreams(
     config.apiBaseUrl,
     config.count,
-    config.refreshMinutes
+    config.refreshMinutes,
+    config.experimental
   );
 
   const [selectedStream, setSelectedStream] = useState<Livestream | null>(null);
