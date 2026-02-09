@@ -294,9 +294,11 @@ class YouTubeClient:
                 )
                 
                 # Get view count (live concurrent viewers or total views)
-                # For live streams, concurrentViewers is the real-time count
-                if is_live and "concurrentViewers" in live_details:
-                    view_count = int(live_details["concurrentViewers"])
+                # For live streams, concurrentViewers is the real-time count.
+                # If YouTube omits concurrentViewers when it is 0, default to 0
+                # instead of falling back to total viewCount.
+                if is_live:
+                    view_count = int(live_details.get("concurrentViewers", 0) or 0)
                 else:
                     view_count = int(statistics.get("viewCount", 0))
                 
