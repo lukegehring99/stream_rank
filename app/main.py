@@ -106,14 +106,14 @@ Use `/auth/login` to obtain an access token.
     # Middleware
     # =========================================================================
     
-    # CORS - Allow all origins (as per requirements)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
-        allow_credentials=settings.cors_allow_credentials,
-        allow_methods=settings.cors_allow_methods,
-        allow_headers=settings.cors_allow_headers,
-    )
+    # CORS - Allow all origins (as per requirements) - disabling for nginx CORS handling
+    # app.add_middleware(
+    #     CORSMiddleware,
+    #     allow_origins=settings.cors_origins_list,
+    #     allow_credentials=settings.cors_allow_credentials,
+    #     allow_methods=settings.cors_allow_methods,
+    #     allow_headers=settings.cors_allow_headers,
+    # )
     
     # =========================================================================
     # Exception Handlers
