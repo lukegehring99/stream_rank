@@ -120,6 +120,34 @@ services:
     # Override default command to run worker
     command: ["python", "-m", "worker.main"]
 
+  # ===================
+  # Admin Frontend (Prod)
+  # ===================
+  admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: https://api.anomaly.lukewasbored.com/api/v1
+        VITE_API_URL: https://api.anomaly.lukewasbored.com/api/v1
+        VITE_WIDGET_URL: https://anomaly.lukewasbored.com
+        VITE_WIDGET_GITHUB_URL: https://anomaly.lukewasbored.com
+    container_name: streamrank_admin
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-3001}:80"
+    networks:
+      - streamrank_net
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
 # ===================
 # Networks
 # ===================
