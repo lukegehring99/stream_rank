@@ -94,11 +94,11 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 via-accent-500 to-coral-500 flex items-center justify-center shadow-glow">
+              <div className="w-9 h-9 flex items-center justify-center">
                 <img
                   src="/logo.svg"
                   alt="Logo"
-                  className="w-5 h-5"
+                  className="w-9 h-9 object-contain"
                 />
               </div>
               <div>
