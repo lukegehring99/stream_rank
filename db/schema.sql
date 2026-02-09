@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS livestreams (
     description TEXT COMMENT 'Stream description',
     url VARCHAR(512) NOT NULL COMMENT 'Full YouTube URL',
     is_live BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Currently streaming',
+    peak_viewers INT NOT NULL DEFAULT 0 COMMENT 'Peak viewer count',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
