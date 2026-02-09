@@ -122,7 +122,7 @@ class AnomalyConfig:
     baseline_hours: int = 24
     
     # Minimum sample requirements
-    min_recent_samples: int = 5
+    min_recent_samples: int = 3
     min_baseline_samples: int = 1000
     
     # Algorithm selection
