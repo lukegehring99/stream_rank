@@ -428,6 +428,10 @@ class AsyncAnomalyDetector:
         if recent_median == 0 and recent_max == 0:
             return AnomalyStatus.INACTIVE
         
+        # Check minimum viewcount threshold
+        if recent_max < self.config.min_viewcount:
+            return AnomalyStatus.INACTIVE
+        
         # Check for dramatic drop from baseline
         if not baseline_data.is_empty:
             baseline_median = np.median(baseline_data.viewcounts)

@@ -124,6 +124,7 @@ class AnomalyConfig:
     # Minimum sample requirements
     min_recent_samples: int = 3
     min_baseline_samples: int = 1000
+    min_viewcount: int = 10
     
     # Algorithm selection
     algorithm: Literal["quantile", "zscore"] = "quantile"
